@@ -103,7 +103,7 @@ export async function runShop() {
   const bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubTex, depthTest: false, transparent: true })); bubble.renderOrder = 20;
   bubble.position.set(0.5, 2.05, 0.9); bubble.scale.setScalar(0); S.add(bubble);
 
-  await setShot({ look: V(-0.25, 1.38, 0.7), dir: V(0, 0.42, -1), w: P ? 2.9 : 3.3, h: 2.05 }, 0);
+  await setShot({ look: V(-0.4, 1.45, 0.75), dir: V(0, 0.3, -1), w: P ? 3.1 : 3.4, h: 1.9 }, 0);
   await fade(0, 0.6);
   SFX.jingle();
 

@@ -16,8 +16,8 @@ export async function runBlocks() {
   const stripe = canvasTex(64, 64, c => { for (let i = 0; i < 8; i++) { c.fillStyle = i % 2 ? '#ffffff' : '#ff6fb1'; c.fillRect(i * 8, 0, 8, 64); } });
   const M = {
     stone: mat(0xa6a3ad, { roughness: 0.9 }),
-    dirt: mat(0xa8744a, { roughness: 0.95 }),
-    grass: mat(0x86d35e, { roughness: 0.85 }),
+    dirt: mat(0x9a6038, { roughness: 0.95 }),
+    grass: mat(0x5cbf3a, { roughness: 0.85 }),
     pink: fluffMat(0xffffff, 0.35),
     sand: mat(0xf5dea2, { roughness: 0.95 }),
     cream: mat(0xfff4da, { roughness: 0.7 }),
@@ -195,13 +195,15 @@ export async function runBlocks() {
       if (Math.random() < 0.4) react();
     } else {
       const n = h.face.normal;
-      const x = c.x + Math.round(n.x), y = c.y + Math.round(n.y), z = c.z + Math.round(n.z);
+      const ax = Math.abs(n.x), ay = Math.abs(n.y), az = Math.abs(n.z);
+      const dx = ax >= ay && ax >= az ? Math.sign(n.x) : 0, dy = !dx && ay >= az ? Math.sign(n.y) : 0, dz = !dx && !dy ? Math.sign(n.z) : 0;
+      const x = c.x + dx, y = c.y + dy, z = c.z + dz;
       if (x < MIN || x > MAX || z < MIN || z > MAX || y < 1 || y > YMAX || grid.has(key(x, y, z))) { SFX.boing(); squash(m, 0.12, 0.3); return; }
       put(x, y, z, tool, true);
       if (Math.random() < 0.4) react();
     }
   });
-  await setShot({ look: V(-0.4, 2.2, 0.2), dir: V(0.5, 0.78, 1), w: isPortrait() ? 11 : 13, h: 9.5 }, 0);
+  await setShot({ look: V(-0.5, 1.6, 0.3), dir: V(0.5, 0.78, 1), w: isPortrait() ? 12.5 : 15, h: 11.5 }, 0);
   await fade(0, 0.8);
   bGirl.jump(); bGirl.face('laugh', 1.5); SFX.fanfare();
   setHint(() => first ? grid.get(key(0, 2, 2)) : null);

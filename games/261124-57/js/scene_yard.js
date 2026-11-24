@@ -155,10 +155,10 @@ export async function runTruck() {
     { make: partCab, slot: V(2.05, 1.2, 0), rest: V(2.4 * xs, 0, 3.4), spin: 0 },
     { make: partSign, slot: V(-0.3, 3.12, 0), rest: V(1.05 * xs, 0, 3.1), spin: 0 },
     { make: partWindow, slot: V(-0.3, 1.82, 1.08), rest: V(-0.95 * xs, 0, 3.1), spin: 0, win: true },
-    { make: partWheel, slot: V(-1.3, 0.42, 1.0), rest: V(-1.35 * xs, 0, 4.3), wheel: 1 },
-    { make: partWheel, slot: V(1.95, 0.42, 1.0), rest: V(-0.45 * xs, 0, 4.45), wheel: 1 },
-    { make: partWheel, slot: V(-1.3, 0.42, -1.0), rest: V(0.45 * xs, 0, 4.45), wheel: -1 },
-    { make: partWheel, slot: V(1.95, 0.42, -1.0), rest: V(1.35 * xs, 0, 4.3), wheel: -1 },
+    { make: partWheel, slot: V(-1.3, 0.42, 1.0), rest: V(-1.35 * xs, 0, 3.85), wheel: 1 },
+    { make: partWheel, slot: V(1.95, 0.42, 1.0), rest: V(-0.45 * xs, 0, 3.95), wheel: 1 },
+    { make: partWheel, slot: V(-1.3, 0.42, -1.0), rest: V(0.45 * xs, 0, 3.95), wheel: -1 },
+    { make: partWheel, slot: V(1.95, 0.42, -1.0), rest: V(1.35 * xs, 0, 3.85), wheel: -1 },
   ];
   const MINI = 0.32;
   const parts = defs.map(d => {
@@ -175,8 +175,8 @@ export async function runTruck() {
     return { ...d, g, gh, restY, placed: false };
   });
   const win = parts.find(p => p.win);
-  girl.root.position.set(P ? -2.0 : -3.6, 0, P ? 2.0 : 2.3); girl.root.rotation.y = 0.5; girl.lookAt(0);
-  await setShot({ look: V(0, 1.45, 1.8), dir: V(0.22, 0.32, 1), w: P ? 5.4 : 7.4, h: 4.6 }, 0);
+  girl.root.position.set(P ? -2.0 : -2.9, 0, P ? 2.2 : 2.6); girl.root.rotation.y = 0.5; girl.lookAt(0);
+  await setShot({ look: V(0, 1.25, 2.0), dir: V(0.22, 0.32, 1), w: P ? 5.4 : 7.4, h: 4.6 }, 0);
   await fade(0, 0.6);
   // parts rain down
   for (const p of parts) {

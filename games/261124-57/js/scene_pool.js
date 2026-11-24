@@ -43,6 +43,7 @@ export async function runPool(dadIce) {
   const puddle = new THREE.Mesh(new THREE.CircleGeometry(0.38, 28), new THREE.MeshPhysicalMaterial({ color: 0xbfe9ff, transparent: true, opacity: 0.55, roughness: 0.02, clearcoat: 1 }));
   puddle.rotation.x = -Math.PI / 2; puddle.scale.set(1.4, 0.8, 1); puddle.position.set(puddleX, 0.006, 1.35); S.add(puddle);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.12, 16, 36), fluffMat(0xffffff, 0.6)); ring.rotation.x = -Math.PI / 2; ring.position.set(girlX - 0.75, 0.12, 1.6); shadowy(ring); S.add(ring);
+  { const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.3, 16), new THREE.MeshBasicMaterial({ visible: false })); hit.rotation.x = Math.PI / 2; hit.userData.proxy = true; ring.add(hit); }
   // water ripple animation
   const offW = onUpdate(dt => { POOL.cau.offset.x += dt * 0.02; POOL.cau.offset.y += dt * 0.013; });
   girl.root.visible = true; girl.root.position.set(girlX, 0, 1.75); girl.root.rotation.y = -1.2; girl.lookAt(0); girl.st.baseY = 0;
@@ -50,7 +51,7 @@ export async function runPool(dadIce) {
   dad.face('happy');
   if (dadIce) { dad.hand(1).add(dadIce); dadIce.position.set(0, 0.12, 0); dadIce.rotation.set(0, 0, 0); dadIce.scale.setScalar(1 / dad.s); }
   dad.pose('hold', 99);
-  await setShot({ look: V(-0.4, 0.35, 0.5), dir: V(0.05, 0.62, 1), w: P ? 5.2 : 7.4, h: 3.8 }, 0);
+  await setShot({ look: V(-0.3, 0.55, 0.6), dir: V(0.05, 0.22, 1), w: P ? 5.4 : 8.2, h: 3.6 }, 0);
   await fade(0, 0.6);
   // extra toys: tap sign / water / girl any time
   tappable(sign, async () => { SFX.pip(); setTimeout(SFX.pip, 160); girl.pose('point', 0.8); await tween(0.5, t => sign.rotation.z = Math.sin(t * Math.PI * 4) * 0.08 * (1 - t), ease.lin); });

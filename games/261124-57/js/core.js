@@ -119,6 +119,7 @@ function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
+  camera.fov = camera.aspect < 1 ? 55 : 40;
   camera.updateProjectionMatrix();
   if (shot) { const p = shotPose(shot); camera.position.copy(p.pos); camLook.copy(p.look); camera.lookAt(camLook); }
 }

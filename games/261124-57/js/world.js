@@ -53,7 +53,7 @@ export const POOL = { x0: -2.4, x1: 2.4, z0: -1.8, z1: 0.8, water: -0.18, floor:
   const deck = (x0, x1, z0, z1) => {
     const w = x1 - x0, d = z1 - z0;
     const t = tile.clone(); t.needsUpdate = true; t.repeat.set(w / 1.2, d / 1.2);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ map: t, roughness: 0.75 }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ map: t, roughness: 0.75, color: 0xc9c0b4 }));
     m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, 0, (z0 + z1) / 2); m.receiveShadow = true; pool.add(m);
   };
   deck(-26, 26, P.z1, 26); deck(-26, 26, -26, P.z0); deck(-26, P.x0, P.z0, P.z1); deck(P.x1, 26, P.z0, P.z1);
@@ -80,7 +80,7 @@ export const POOL = { x0: -2.4, x1: 2.4, z0: -1.8, z1: 0.8, water: -0.18, floor:
   const water = new THREE.Mesh(new THREE.PlaneGeometry(P.x1 - P.x0, P.z1 - P.z0), new THREE.MeshPhysicalMaterial({ map: cau, color: 0xbfefff, transparent: true, opacity: 0.78, roughness: 0.05, metalness: 0, clearcoat: 1, envMapIntensity: 1.2 }));
   water.rotation.x = -Math.PI / 2; water.position.set((P.x0 + P.x1) / 2, P.water, (P.z0 + P.z1) / 2); water.renderOrder = 2;
   pool.add(water); POOL.waterMesh = water; POOL.cau = cau;
-  const bd = backdrop(TEX.pool, 26, 3.0, 2, -0.3, 2048 / 486);
+  const bd = backdrop(TEX.pool, 14, 3.2, 2, -0.2, 2048 / 486);
   bd.position.z = 0; pool.add(bd);
   // loungers & plants for realism
   const wood = mat(0xc89a6a, { roughness: 0.7 }), cushion = fluffMat(0xffffff, 0.5);

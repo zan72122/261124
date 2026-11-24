@@ -285,6 +285,10 @@ function tickVehicles(dt) {
 }
 async function signature(v, big = true) {
   const u = v.userData;
+  if (u.sigBusy) return; u.sigBusy = true;
+  try { await signature2(v, u); } finally { u.sigBusy = false; }
+}
+async function signature2(v, u) {
   switch (u.kind) {
     case 'ambulance': sfx.pipo(); u.flash = 2.4; break;
     case 'police': sfx.siren(); u.flash = 2.2; break;
@@ -309,6 +313,7 @@ async function munchAnim(v) {
 // ---------- タップ判定 ----------
 const targets = [];
 function addTarget(obj, onTap, opt = {}) {
+  if (opt.kind) obj.userData.kind = opt.kind;
   const t = Object.assign({ obj, onTap, active: true, wand: false, ui: false, r: null, busy: false }, opt);
   obj.traverse((o) => { o.userData.tgt = t; });
   targets.push(t); return t;
@@ -443,7 +448,7 @@ async function sceneCostume() {
   const bob = (dt, t) => hatObjs.forEach((g, i) => { if (!g.userData.chosen) { g.position.y = HATS[i].pos.y + Math.sin(t * 2.2 + i) * 0.1; g.rotation.z = Math.sin(t * 1.5 + i) * 0.2; } });
   ticks.add(bob);
   const chosen = await new Promise((res) => {
-    hatObjs.forEach((g, i) => addTarget(g, () => res(i), { ui: true, r: 0.8 }));
+    hatObjs.forEach((g, i) => addTarget(g, () => res(i), { ui: true, r: 0.8, kind: 'hat' }));
     hintFn = () => targets.find((t) => t.obj === hatObjs[1]);
   });
   hintFn = null;
@@ -462,7 +467,7 @@ async function sceneCostume() {
   await wait(0.3);
   sfx.sparkle(); await anim(0.5, (k) => wand.scale.setScalar(ease.back(k)));
   await wait(0.7);
-  addTarget(girl.g, () => { girl.set('giggle', 1.2); sfx.giggle(); }, { ui: true, r: 1.5 });
+  addTarget(girl.g, () => { girl.set('giggle', 1.2); sfx.giggle(); }, { ui: true, r: 1.5, kind: 'girl' });
 }
 
 // =====================================================================
@@ -639,7 +644,7 @@ async function dadSpill() {
   await walkDad(V(-3.6, 0, 5.4), 2.3);
   sfx.oops(); dad.set('wow', 1);
   await anim(0.35, (k) => { dad.body.rotation.x = k * 0.7; });
-  const spots = [V(-3.9, 0, 8.6), V(-2.6, 0, 9.6), V(-1.0, 0, 7.6), V(-3.2, 0, 7.0), V(-1.6, 0, 10.2), V(0.6, 0, 8.0)];
+  const spots = [V(-3.1, 0, 8.8), V(-2.0, 0, 9.9), V(-0.6, 0, 7.8), V(-2.4, 0, 7.2), V(-1.0, 0, 10.5), V(0.8, 0, 8.4)];
   scene.updateMatrixWorld(true);
   held.forEach((b, i) => {
     world.attach(b); const s = b.position.clone(), e = spots[i]; b.scale.setScalar(b === ball ? 1 : rand(0.9, 1.05));
@@ -653,7 +658,7 @@ async function dadSpill() {
   girl.set('determined', 2.2);
   await wait(1.2);
   await anim(0.5, (k) => { dad.body.rotation.x = -0.25 * (1 - k); dad.body.position.y = -1.4 * (1 - k); });
-  await walkDad(V(-4.6, 0, 9.8), 1.4);
+  await walkDad(V(-3.9, 0, 10.6), 1.4);
   dad.g.rotation.y = faceCam(dad.g); dad.set('normal');
 }
 function setupGarbage(finish) {
@@ -668,7 +673,7 @@ function setupGarbage(finish) {
       b.visible = false; sfx.munch(); munchAnim(gt);
       eaten++;
       if (eaten === bags.length) { await wait(0.8); sfx.melody(); gt.userData.flash = 2; addStarBadge(gt); finish(); addTarget(gt, () => playVehicle('garbage'), { r: 3 }); }
-    }, { r: 0.6 });
+    }, { r: 0.6, kind: 'bag' });
   }
   // ちがう物：ボール → ぺっ → パパ「あれ？」→ にっこり
   let withDad = false;
@@ -693,8 +698,8 @@ function setupGarbage(finish) {
       ball.userData.toss = false;
     }
     bt.busy = false;
-  }, { r: 0.5 });
-  addTarget(dad.g, () => { if (withDad) bt.onTap(); else { cheerDad(1.2); sfx.giggle(); } }, { r: 1 });
+  }, { r: 0.5, kind: 'ball' });
+  addTarget(dad.g, () => { if (withDad) bt.onTap(); else { cheerDad(1.2); sfx.giggle(); } }, { r: 1, kind: 'dad' });
 }
 function addStarBadge(v) {
   const s = M.makeStar(0.55); s.position.set(0, 4.3, 0); v.add(s); s.scale.setScalar(0);
@@ -723,7 +728,7 @@ function setupMixer(finish) {
     girl.set('happy', 1.2);
     if (fills === 3) {
       t.done = true; slab.material.roughness = 0.25; sfx.sparkle(); addStarBadge(mx); finish();
-      addTarget(slab, (p) => handprint(p), { r: 1.4 });
+      addTarget(slab, (p) => handprint(p), { r: 1.4, kind: 'slab' });
     }
     t.busy = false;
   }, { r: 3.2 });
@@ -766,7 +771,7 @@ function setupDump(finish) {
     girl.set('happy', 1.5);
     await anim(1.2, (k) => u.bed.rotation.z = 0.9 * (1 - k));
     t.done = true; addStarBadge(dp); finish(); t.busy = false;
-    addTarget(pile, (p) => { burst(p.clone(), 14, 0.3, 2); sfx.pop(0, 72); girl.set('giggle', 1); }, { r: 1.6 });
+    addTarget(pile, (p) => { burst(p.clone(), 14, 0.3, 2); sfx.pop(0, 72); girl.set('giggle', 1); }, { r: 1.6, kind: 'pile' });
   }, { r: 3 });
   u.job = t;
 }
@@ -810,7 +815,7 @@ async function scene3() {
       const fp = prints[Math.min(next, N - 1)].position;
       shot(V(lerp(5.0, fp.x, 0.5), 3.8, fp.z - 6.0), V(lerp(5.0, fp.x, 0.6), 0, fp.z + 0.8), 42, 1.0);
       if (next >= N) res();
-    }, { r: 0.4 }));
+    }, { r: 0.4, kind: 'print' }));
     hintFn = () => targets.find((t) => t.obj === prints[next]);
   });
   ticks.delete(glowTick); world.remove(glow);
@@ -826,7 +831,7 @@ async function scene3() {
         await growAnimal(a, key, lanes[key][0], grown === 0);
         grown++; t2.forEach((q) => q.busy = false);
         if (grown === 2) res();
-      }, { wand: true, r: 0.3 });
+      }, { wand: true, r: 0.3, kind: 'toy' });
       a.userData.t = t;
     }
     var t2 = [dino.userData.t, croc.userData.t];
@@ -859,7 +864,7 @@ async function scene3() {
           if (!open) reactAnimal(animals[key], key);
         }
         t.busy = false;
-      }, { r: 0.7, center: () => tm.position.clone().add(V(0.3, 0.4, 0)) });
+      }, { r: 0.7, kind: 'tape', center: () => tm.position.clone().add(V(0.3, 0.4, 0)) });
       tm.userData.t = t;
     }
     hintFn = () => Object.values(tapes).map((tm) => tm.userData.t).find((t) => !t.obj.userData.done);
@@ -947,7 +952,7 @@ async function debugSkip(n) {
   // 3: 場面2を終えた状態をつくる
   for (const [k, v] of Object.entries(vehicles)) { const p = S2[k]; v.rotation.y = yawTo(p[2], p[3]); v.position.set(p[0], 0, p[1]); v.scale.setScalar(1); v.visible = true; }
   scene.updateMatrixWorld(true); buildS2Props(); slab.scale.y = 0.2; slab.position.y = 0.1; pile.scale.setScalar(1); vehicles.dump.userData.sand.visible = false;
-  bags.forEach((b) => b.visible = false); ball.visible = false; dad.g.position.set(-4.6, 0, 9.8);
+  bags.forEach((b) => b.visible = false); ball.visible = false; dad.g.position.set(-3.9, 0, 10.6);
   cam.pos.copy(SHOT.s2[0]); cam.tgt.copy(SHOT.s2[1]); cam.h = SHOT.s2[2];
   await scene3();
 }

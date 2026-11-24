@@ -321,7 +321,7 @@ class Water {
     const p = geo.attributes.position; this.base = new Float32Array(p.count * 2);
     for (let i = 0; i < p.count; i++) { this.base[i * 2] = p.getX(i); this.base[i * 2 + 1] = p.getZ(i); }
     this.mat = new THREE.MeshPhysicalMaterial({
-      color, roughness: .06, metalness: 0, transparent: true, opacity: .64,
+      color, roughness: .06, metalness: 0, transparent: true, opacity: .7,
       clearcoat: 1, clearcoatRoughness: .04, envMapIntensity: 1.3, side: THREE.DoubleSide,
       specularIntensity: 1, depthWrite: false,
     });
@@ -363,7 +363,7 @@ const T = {
 T.yard.wrapS = T.yard.wrapT = T.park.wrapS = T.park.wrapT = THREE.ClampToEdgeWrapping;
 
 const POOL = { w: 4.8, d: 2.8, depth: 1.05, wy: -.13 };
-const AQUA = new THREE.Color(0x56cfe0);
+const AQUA = new THREE.Color(0x2fbad6);
 let pool;
 
 function backdrop(map, c, w, hor, z) {
@@ -602,6 +602,7 @@ function makePerson(o) {
     mesh(new THREE.CapsuleGeometry(armR, armL - armR * 2, 4, 10), o.sleeves ? topM : skin, piv, 0, -armL / 2, 0);
     const hand = mesh(new THREE.SphereGeometry(armR * 1.25, 12, 10), skin, piv, 0, -armL, 0);
     piv.hand = hand; piv.s = s; piv.cur = { x: 0, z: s * .12 };
+    mesh(new THREE.SphereGeometry(armR * 1.25, 12, 10), o.sleeves ? topM : skin, piv, 0, -armR * .2, 0);
     P.arms.push(piv);
   }
   // head
@@ -967,24 +968,30 @@ function makeBubble(kind, pS, oS) {
     drawFloatIcon(x, kind, 128, 108, 66, pS, oS);
   });
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false }));
-  sp.scale.set(.62, .62, 1); sp.renderOrder = 15;
+  sp.scale.set(.85, .85, 1); sp.renderOrder = 15;
   return sp;
 }
 
 // ---------------------------------------------------------------- camera
 const cam = { look: V(0, 0, 0), dir: V(0, .6, 1).normalize(), fitW: 8, fitH: 5, curPos: V(0, 5, 8), curLook: V(), speed: 1.6 };
 function shot(look, dir, fitW, fitH, speed = 1.6) { cam.look.copy(look); cam.dir.copy(dir).normalize(); cam.fitW = fitW; cam.fitH = fitH; cam.speed = speed; }
+function camLook() {
+  // tall phone screens: shift the view toward the near deck so the extra height shows the yard, not empty lawn
+  return camera.aspect < .62 ? cam.look.clone().add(V(0, cam.fitW * .05, cam.fitW * .06)) : cam.look;
+}
 function camTarget() {
   const vf = THREE.MathUtils.degToRad(camera.fov) / 2, asp = camera.aspect;
-  const d = Math.max(cam.fitH / 2 / Math.tan(vf), cam.fitW / 2 / (Math.tan(vf) * asp));
-  return cam.look.clone().addScaledVector(cam.dir, d);
+  const fw = asp < .8 ? cam.fitW * (asp < .62 ? .8 : .85) : cam.fitW;
+  const d = Math.max(cam.fitH / 2 / Math.tan(vf), fw / 2 / (Math.tan(vf) * asp));
+  const dir = asp < .62 ? cam.dir.clone().multiply(V(1, .7, 1)).normalize() : cam.dir;
+  return camLook().clone().addScaledVector(dir, d);
 }
-function snapCam() { cam.curPos.copy(camTarget()); cam.curLook.copy(cam.look); }
+function snapCam() { cam.curPos.copy(camTarget()); cam.curLook.copy(camLook()); }
 let swayT = 0;
 function updateCam(dt) {
   swayT += dt;
   const k = 1 - Math.exp(-dt * cam.speed);
-  cam.curPos.lerp(camTarget(), k); cam.curLook.lerp(cam.look, k);
+  cam.curPos.lerp(camTarget(), k); cam.curLook.lerp(camLook(), k);
   camera.position.copy(cam.curPos).add(V(Math.sin(swayT * .3) * .08, Math.sin(swayT * .23) * .05, 0));
   camera.lookAt(cam.curLook);
 }
@@ -1175,16 +1182,16 @@ async function throwAnim(P, target) {
 async function stage1() {
   // set the scene
   boy.g.visible = papa.g.visible = mom.g.visible = true;
-  place(girl, -2.85, .75, Math.PI / 2); girl.lookAt(0, .3);
-  place(boy, 2.85, .4, -Math.PI / 2); boy.lookAt(0, 0);
+  place(girl, -2.6, 1.55, Math.PI / 2); girl.lookAt(0, .3);
+  place(boy, 2.65, .95, -Math.PI / 2); boy.lookAt(0, 0);
   place(papa, .3, -2.25, 0); place(mom, -1.6, -2.45, .2);
   sign.visible = true; sign.setDraw(signBalls);
   for (let i = 0; i < 9; i++) { const b = makeBall(playerCol); b.position.set(basket.position.x + rnd(-.22, .22), .38 + rnd(0, .14), basket.position.z + rnd(-.22, .22)); basketBalls.push(b); }
-  shot(V(0, .15, -.35), V(0, .44, 1), 8.6, 5.2, 1.2);
+  shot(V(0, .1, -.25), V(0, .44, 1), 7.6, 4.6, 1.2);
   // walk boy in
   await wait(1.2);
   // papa gag: throws a ball straight up... and it bonks his head
-  shot(V(.3, .7, -1.6), V(0, .35, 1), 3.4, 2.6, 2);
+  shot(V(.1, 1.15, -1.7), V(0, .3, 1), 3.6, 3.4, 2);
   await wait(.6);
   papa.setMood('happy'); setPose(papa, 'reach', .5);
   const pb = makeBall(playerCol); pb.position.copy(papa.handWorld(1));
@@ -1205,7 +1212,7 @@ async function stage1() {
   await wait(.2);
   girl.react('laugh'); boy.react('laugh'); mom.react('laugh'); papa.react('laugh');
   await wait(1.0);
-  shot(V(0, .15, -.35), V(0, .44, 1), 8.6, 5.2, 1.4);
+  shot(V(0, .1, -.25), V(0, .44, 1), 7.6, 4.6, 1.4);
   // play
   const GOAL = 26;
   let done = false, boyConverted = false, lastThrow = 0;
@@ -1264,7 +1271,7 @@ async function stage1() {
   other.sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
   other.forEach((b, i) => wait(i * .08).then(() => { b.col = playerCol; b.m.material = BALLM[playerCol]; b.hop = .5; sparkleAt(b.m.position, [tint, C_WHITE], 8, .8); sfx.pop(); }));
   const c0 = pool.mat.color.clone(), strong = tintFor(playerCol).multiplyScalar(1.05);
-  await play(1.6, k => { pool.mat.color.copy(c0).lerp(strong, easeIO(k)); pool.mat.opacity = .64 + .2 * k; });
+  await play(1.6, k => { pool.mat.color.copy(c0).lerp(strong, easeIO(k)); pool.mat.opacity = .7 + .15 * k; });
   sfx.fanfare(); confettiAt(V(0, .5, 0), 140);
   for (const P of people) { P.lookAt(0, 0); P.react('wow'); }
   balls.forEach((b, i) => { b.hop = .5 + (i % 5) * .05; });
@@ -1279,7 +1286,7 @@ async function stage1() {
     const from = b.m.position.clone();
     wait(i * .035).then(() => tween(.7, k => { b.m.position.lerpVectors(from, bpos, k); b.m.position.y += Math.sin(Math.PI * k) * 1.6; b.m.scale.setScalar(k > .85 ? (1 - k) / .15 : 1); }, () => { scene.remove(b.m); if (i % 4 === 0) sfx.pop(); }));
   });
-  await play(1.5, k => { pool.mat.color.copy(strong).lerp(AQUA.clone().lerp(tint, .18), easeIO(k)); pool.mat.opacity = .84 - .2 * k; });
+  await play(1.5, k => { pool.mat.color.copy(strong).lerp(AQUA.clone().lerp(tint, .18), easeIO(k)); pool.mat.opacity = .85 - .15 * k; });
   balls.length = 0;
 }
 
@@ -1301,7 +1308,7 @@ function signToys(x) {
 async function stage2() {
   sign.setDraw(signToys);
   // characters move around
-  place(girl, -3.1, .9, Math.PI / 2); girl.lookAt(0, .3);
+  place(girl, -2.75, 1.45, Math.PI / 2); girl.lookAt(0, .3);
   place(boy, 2.4, -2.3, 0); place(papa, .2, -2.35, 0); place(mom, -1.5, -2.45, .2);
   boy.faceDir = -.2;
   // toys on the near deck
@@ -1560,9 +1567,9 @@ async function stage3() {
   await fade(true);
   sfx.whoosh();
   sunAt(PARK); area = 1;
-  animals.forEach(a => { a.g.visible = false; a.g.rotation.set(0, 0, 0); a.mode = 'idle'; });
+  animals.forEach(a => { a.g.visible = false; a.g.rotation.set(0, 0, 0); a.mode = 'idle'; a.setReal(true); a.sleep = false; });
   sign.position.set(PARK.x - 6.4, 0, PARK.z + 3.3); sign.rotation.y = .5; sign.setDraw(signFloats);
-  const nearZ = PARK.z + RIV.b + RIV.hw + .75;
+  const nearZ = PARK.z + RIV.b + RIV.hw + .75, SX = innerWidth / innerHeight < .8 ? .66 : 1;
   const W = [
     { C: mom, x: -3.6, want: 'heart' }, { C: seal, x: -2.35, want: 'stripe' }, { C: octo, x: -1.2, want: 'star' },
     { C: crab, x: 1.35, want: 'tiny' }, { C: boy, x: 2.6, want: 'boys' },
@@ -1570,7 +1577,7 @@ async function stage3() {
   place(girl, PARK.x + .1, nearZ + .2, 0);
   for (const w of W) {
     const C = w.C; C.g.visible = true;
-    C.g.position.set(PARK.x + w.x, 0, nearZ + (C.kind === 'crab' || C.kind === 'octopus' ? .1 : 0));
+    C.g.position.set(PARK.x + w.x * SX, 0, nearZ + (C.kind === 'crab' || C.kind === 'octopus' ? .1 : 0));
     if (C.setReal) { C.g.scale.setScalar(C.realScale * .8); C.g.rotation.set(0, 0, 0); C.sleep = false; C.eyes && C.eyes.forEach(e => e.scale.setScalar(1)); }
     else { C.faceDir = 0; C.g.rotation.y = 0; C.sitting = false; }
     w.bub = makeBubble(w.want, colS(), otherS()); w.bub.visible = false; scene.add(w.bub);
@@ -1578,7 +1585,7 @@ async function stage3() {
   }
   dolphin.g.visible = true; dolphin.g.scale.setScalar(.85); dolphin.mode = 'river'; dolphin.th = 0;
   // papa with ALL the floats
-  place(papa, PARK.x - .9, nearZ - .05, 0);
+  place(papa, PARK.x - .9 * SX, nearZ - .05, 0);
   const kinds = ['mine', 'boys', 'stripe', 'heart', 'star', 'tiny'];
   const fl = {};
   const slots = [
@@ -1590,7 +1597,7 @@ async function stage3() {
     ['tiny', V(0, papa.top + papa.headR * 2 + .05, 0), V(.2, 0, 0), 1.1],
   ];
   for (const [k, p, r, s] of slots) { const f = makeFloat(k, colHex(), otherHex()); f.position.copy(p); f.rotation.set(r.x, r.y, r.z); f.scale.setScalar(s); f.slot = { p, r, s }; papa.body.add(f); fl[k] = f; }
-  shot(V(PARK.x, .3, PARK.z + 1.0), V(0, .78, 1), 11, 8.2, 1.2); snapCam();
+  shot(V(PARK.x, .3, PARK.z + 1.1), V(0, .5, 1), 11.4, 6.4, 1.2); snapCam();
   people.forEach(p => { p.tilt = 0; p.setMood('normal'); });
   await fade(false);
   // papa hogs them all
@@ -1606,13 +1613,14 @@ async function stage3() {
   await play(.7, k => { papa.g.position.lerpVectors(from, land, k); papa.g.position.y += Math.sin(Math.PI * k) * .9; });
   splashAt(V(land.x, RIV.wy, land.z), 1.6); river.ripple(land.x, land.z, .12); sfx.splash(1.3);
   papa.sitting = true; papa.basePose = 'flail'; setPose(papa, 'flail');
-  shot(V(PARK.x, .3, PARK.z + .9), V(0, .78, 1), 11, 8.2, 1.0);
+  shot(V(PARK.x, .3, PARK.z + 1.1), V(0, .5, 1), 11.4, 6.4, 1.0);
   papa.th = th0; papa.mode = 'drift';
   let given = 0;
   const TOTAL = W.length;
-  const thTarget = () => Math.PI / 2 - .25 + Math.PI * 2 * 0 + (TOTAL ? lerp(Math.PI, TAU, given / TOTAL) : 0);
+  const REST = th0 + Math.PI * (SX < 1 ? .5 : .6);
+  const thTarget = () => lerp(REST, th0 + TAU, given / TOTAL);
   // drift to far side
-  await play(2.4, k => { papa.th = lerp(th0, th0 + Math.PI, easeIO(k)); });
+  await play(2.4, k => { papa.th = lerp(th0, REST, easeIO(k)); });
   papa.setMood('sad'); say('papa', 'uh');
   girl.setFace('surprised', 1); W.forEach(w => { w.bub.visible = true; });
   // interaction
@@ -1643,7 +1651,7 @@ async function stage3() {
     const a = f.position.clone();
     await play(.6, k => { f.position.lerpVectors(a, target, k); f.position.y += Math.sin(Math.PI * k) * .9; f.rotation.y += .2; });
     w.C.g.attach(f); f.rotation.set(0, 0, 0);
-    if (w.C.setReal) { f.scale.setScalar((w.C === octo ? .75 : 1) / w.C.g.scale.x); f.position.set(0, wy / w.C.g.scale.x, 0); }
+    if (w.C.setReal) { const ws = { seal: 1, octopus: .72, crab: .5 }[w.C.kind] * (f.kind === 'tiny' ? 1.6 : 1); f.scale.setScalar(ws / w.C.g.scale.x); f.position.set(0, wy / w.C.g.scale.x, 0); }
     else { f.scale.setScalar(w.C === boy ? .85 : .9); f.position.set(0, w.C.waistY + .03, 0); }
     w.bub.visible = false;
     const right = f.kind === w.want;
@@ -1712,7 +1720,7 @@ async function stage3() {
   // papa gets his own (silly little) float back: the slide drops one for him
   const pfl = makeFloat('mine', 0xffd25a, 0xffd25a); papa.g.add(pfl); pfl.position.set(0, papa.waistY + .05, 0); pfl.scale.setScalar(1.25);
   await wait(1);
-  shot(V(PARK.x, .3, PARK.z + .9), V(0, .78, 1), 11, 8.2, 1.0);
+  shot(V(PARK.x, .3, PARK.z + 1.1), V(0, .5, 1), 11.4, 6.4, 1.0);
   await freePlay();
 }
 
@@ -1809,7 +1817,7 @@ function resize() {
   for (const p of [drops, sparks, confetti]) p.mat.uniforms.scale.value = sc;
 }
 addEventListener('resize', resize); resize();
-shot(V(0, .15, -.35), V(0, .44, 1), 8.6, 5.2); snapCam();
+shot(V(0, .1, -.25), V(0, .44, 1), 7.6, 4.6); snapCam();
 // title scene arrangement
 place(girl, -3.0, .55, .5); place(boy, 3.0, .3, -.5); place(papa, .3, -2.25, 0); place(mom, -1.6, -2.45, .2);
 

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2b2622">
+<title>おうちに来たロボット</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='10' y='14' width='44' height='38' rx='10' fill='%23c9ced6'/%3E%3Crect x='17' y='22' width='30' height='18' rx='6' fill='%23162028'/%3E%3Ccircle cx='26' cy='31' r='4' fill='%2366e8ff'/%3E%3Ccircle cx='38' cy='31' r='4' fill='%2366e8ff'/%3E%3C/svg%3E">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#2b2622;touch-action:none;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  canvas#c{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;display:block;touch-action:none}
+  .ov{position:fixed;inset:0;pointer-events:none}
+  #start{pointer-events:auto;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 45%,#f7e6c8 0%,#d9b588 55%,#a67a4c 100%);transition:opacity .6s}
+  #start.gone{opacity:0;pointer-events:none}
+  #playBtn{width:min(56vmin,320px);height:min(56vmin,320px);border-radius:50%;border:0;padding:0;cursor:pointer;
+    background:radial-gradient(circle at 35% 30%,#ffffff 0%,#dfe4ea 35%,#9aa3ad 100%);
+    box-shadow:0 14px 0 #6f5232,0 24px 40px rgba(0,0,0,.35);animation:bob 1.6s ease-in-out infinite}
+  #playBtn:active{transform:translateY(8px);box-shadow:0 6px 0 #6f5232}
+  #playBtn svg{width:100%;height:100%}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+  #loading{position:absolute;bottom:12%;left:50%;width:120px;height:14px;margin-left:-60px;border-radius:7px;background:rgba(0,0,0,.15);overflow:hidden}
+  #loading i{display:block;height:100%;width:0;background:#fff;border-radius:7px;transition:width .3s}
+  #scan{opacity:0;transition:opacity .5s;
+    background:
+      repeating-linear-gradient(0deg,rgba(120,240,255,.10) 0 2px,transparent 2px 5px),
+      radial-gradient(ellipse at center,rgba(0,40,60,0) 45%,rgba(0,30,50,.75) 100%);
+    box-shadow:inset 0 0 0 10px rgba(110,230,255,.55),inset 0 0 60px rgba(110,230,255,.5)}
+  #scan.on{opacity:1}
+  #scan .bar{position:absolute;left:0;right:0;height:18vh;top:-20vh;
+    background:linear-gradient(180deg,transparent,rgba(140,245,255,.35),transparent);animation:sweep 2.4s linear infinite}
+  #scan .corner{position:absolute;width:12vmin;height:12vmin;border:6px solid rgba(160,245,255,.9)}
+  #scan .c1{left:4vmin;top:4vmin;border-right:0;border-bottom:0;border-radius:14px 0 0 0}
+  #scan .c2{right:4vmin;top:4vmin;border-left:0;border-bottom:0;border-radius:0 14px 0 0}
+  #scan .c3{left:4vmin;bottom:4vmin;border-right:0;border-top:0;border-radius:0 0 0 14px}
+  #scan .c4{right:4vmin;bottom:4vmin;border-left:0;border-top:0;border-radius:0 0 14px 0}
+  @keyframes sweep{0%{top:-20vh}100%{top:105vh}}
+  #cover{opacity:0;transition:opacity .45s;background:rgba(25,12,10,.92);display:flex;align-items:center;justify-content:center}
+  #cover.on{opacity:1}
+  #cover svg{width:min(90vw,90vh);height:auto}
+  #iris{background:#2b2622;clip-path:circle(150% at 50% 50%);transition:clip-path .7s ease-in-out}
+  #iris.open{clip-path:circle(0% at 50% 50%)}
+  #hand{width:84px;height:84px;margin:-18px 0 0 -30px;opacity:0;transition:opacity .2s;transform-origin:30% 20%;will-change:transform}
+  #hand.on{opacity:1}
+  #hint{width:90px;height:90px;margin:-18px 0 0 -30px;opacity:0;transition:opacity .4s;filter:drop-shadow(0 0 10px #fff)}
+  #hint.on{opacity:.85}
+  #home{pointer-events:auto;position:fixed;left:max(10px,env(safe-area-inset-left));top:max(10px,env(safe-area-inset-top));
+    width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.35);display:none}
+  #home svg{width:100%;height:100%}
+  #home.show{display:block}
+  #fx{overflow:hidden}
+  .ring{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;border:4px solid rgba(255,255,255,.9);
+    animation:ring .5s ease-out forwards}
+  @keyframes ring{to{transform:scale(4);opacity:0}}
+</style>
+<script type="importmap">{"imports":{"three":"./lib/three.module.min.js"}}</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="fx" class="ov"></div>
+<div id="scan" class="ov"><div class="bar"></div><div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div></div>
+<div id="cover" class="ov">
+  <svg viewBox="0 0 400 200"><g fill="#f2c4a2" stroke="#d99a7a" stroke-width="4">
+    <path d="M20 190 C10 120 40 40 90 30 C120 25 150 40 165 60 L190 160 Z"/><path d="M60 40 C70 10 95 5 100 30"/><path d="M95 30 C110 0 135 5 135 35"/>
+    <path d="M380 190 C390 120 360 40 310 30 C280 25 250 40 235 60 L210 160 Z"/><path d="M340 40 C330 10 305 5 300 30"/><path d="M305 30 C290 0 265 5 265 35"/>
+  </g></svg>
+</div>
+<svg id="hand" class="ov" viewBox="0 0 100 100" style="position:fixed;left:0;top:0;inset:auto"></svg>
+<svg id="hint" class="ov" viewBox="0 0 100 100" style="position:fixed;left:0;top:0;inset:auto"></svg>
+<div id="iris" class="ov"></div>
+<div id="home" title=""><svg viewBox="0 0 46 46"><path d="M23 12 A11 11 0 1 1 12.5 19.5" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M8 13 L14 22 L19 13 Z" fill="#fff"/><circle id="homeRing" cx="23" cy="23" r="20" fill="none" stroke="#ffd25a" stroke-width="4" stroke-dasharray="126" stroke-dashoffset="126" transform="rotate(-90 23 23)"/></svg></div>
+<div id="start" class="ov">
+  <button id="playBtn" aria-label="play">
+    <svg viewBox="0 0 200 200">
+      <line x1="100" y1="36" x2="100" y2="18" stroke="#7b848e" stroke-width="6"/><circle cx="100" cy="16" r="9" fill="#ff7a59"/>
+      <rect x="40" y="38" width="120" height="96" rx="24" fill="#c3c9d1" stroke="#8d96a1" stroke-width="4"/>
+      <rect x="54" y="52" width="92" height="58" rx="16" fill="#162028"/>
+      <path d="M68 86 Q78 72 88 86" stroke="#6ef0ff" stroke-width="8" fill="none" stroke-linecap="round"/>
+      <path d="M112 86 Q122 72 132 86" stroke="#6ef0ff" stroke-width="8" fill="none" stroke-linecap="round"/>
+      <rect x="30" y="70" width="12" height="30" rx="5" fill="#4f8fe6"/><rect x="158" y="70" width="12" height="30" rx="5" fill="#4f8fe6"/>
+      <circle cx="100" cy="160" r="26" fill="#ffb347"/><path d="M92 146 L116 160 L92 174 Z" fill="#fff"/>
+    </svg>
+  </button>
+  <div id="loading"><i></i></div>
+</div>
+<script src="../../gf-playlog.js" defer></script>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

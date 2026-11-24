@@ -220,7 +220,7 @@ export function makeQuad(kind) {
   // 首と頭
   const neck = new THREE.Group(); neck.position.set(0, s.R * 0.35, s.L * 0.4); torso.add(neck);
   neck.rotation.x = s.long ? -0.75 : -0.35;
-  pm(cyl(s.R * (s.long ? 0.38 : 0.55), s.R * (s.long ? 0.55 : 0.7), s.neck + s.R * 0.4, 20), neck, V(0, s.neck + s.R * 0.2, 0), { x: 0 }, null, 'neck');
+  pm(cyl(s.R * (s.long ? 0.38 : 0.55), s.R * (s.long ? 0.55 : 0.7), s.neck + s.R * 0.4, 20), neck, V(0, -s.R * 0.2, 0), { x: 0 }, null, 'neck');
   neck.children[0].geometry.rotateX(Math.PI); // 上向きに伸ばす
   const head = new THREE.Group(); head.position.set(0, s.neck + s.R * 0.25, 0); neck.add(head);
   const headInner = new THREE.Group(); head.add(headInner); headInner.rotation.x = -neck.rotation.x; // 頭は前を向く

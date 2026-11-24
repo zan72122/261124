@@ -324,7 +324,7 @@ function buildGarden() {
   const matT = M.canvasTex(256, 256, (g) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { g.fillStyle = (x + y) % 2 ? '#d94545' : '#fbf4ea'; g.fillRect(x * 32, y * 32, 32, 32); } g.fillStyle = 'rgba(217,69,69,0.4)'; for (let i = 0; i < 8; i++) { g.fillRect(i * 32, 0, 32, 256); } });
   const mat = mesh(new THREE.PlaneGeometry(2.4, 1.7), std('#ffffff', 0.95, { map: matT }), garden, V(0.7, 0.012, 0.9), { x: -Math.PI / 2, z: 0.05 }); mat.castShadow = false; G.mat = mat;
   // 看板（絵だけでルールを見せる）
-  const sign = new THREE.Group(); sign.position.set(2.75, -2, 1.5); sign.rotation.y = -0.35; garden.add(sign); G.sign = sign;
+  const sign = new THREE.Group(); sign.position.set(4.75, -2, 0.5); sign.rotation.y = -0.6; garden.add(sign); G.sign = sign;
   mesh(new THREE.BoxGeometry(1.12, 0.86, 0.05), M.woodMat('#b0835a', 0.6), sign, V(0, 1.15, 0));
   mesh(new THREE.PlaneGeometry(1.02, 0.765), std('#ffffff', 0.85, { map: M.signTex() }), sign, V(0, 1.15, 0.03));
   for (const s of [-1, 1]) mesh(new THREE.BoxGeometry(0.07, 1.2, 0.07), M.woodMat('#9a7048', 0.6), sign, V(s * 0.4, 0.4, -0.03));
@@ -335,7 +335,7 @@ function buildGarden() {
   mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 160, 0.025, 8), std('#3ba55c', 0.4), garden, null);
   // 大皿
   const plate = new THREE.Group(); plate.position.set(0.7, 0.012, 0.95); garden.add(plate); G.plate = plate; plate.visible = false;
-  mesh(new THREE.CylinderGeometry(0.55, 0.45, 0.04, 40), std('#f7f5f0', 0.2), plate, V(0, 0.02, 0));
+  mesh(new THREE.CylinderGeometry(0.7, 0.58, 0.04, 40), std('#f7f5f0', 0.2), plate, V(0, 0.02, 0));
 }
 
 // ================================================================
@@ -351,6 +351,7 @@ function setupCharacters() {
   lion = M.makeQuad('lion'); zebra = M.makeQuad('zebra'); tiger = M.makeQuad('tiger');
   trike = M.makeQuad('trike'); rex = M.makeRex(); ptera = M.makePtera();
   [lion, zebra, tiger, trike, rex, ptera].forEach((a) => { scene.add(a.root); a.setMode('wood'); a.alive = false; animals.push(a); a.headTilt = 0; });
+  ptera.finalScale = 1.5;
   // 棚のおもちゃ
   const sh = H.shelf.position;
   place(lion, sh.x - 0.5, sh.y + 0.025, sh.z, 0.5, toyScale.lion);
@@ -372,10 +373,10 @@ const SHOTS = {
   hooks: [V(2.0, 1.5, -1.05), V(2.0, 1.25, -2.95)],
   shelf: [V(0.75, 1.55, -0.85), V(0.75, 1.2, -2.9)],
   room: [V(0.0, 2.15, 4.1), V(0.0, 0.85, -1.4)],
-  seek: [V(0.3, 2.5, 4.6), V(0.3, 0.8, -1.3)],
+  seek: [V(0.1, 2.6, 5.2), V(0.25, 0.8, -1.3)],
   dio: [V(-2.9, 1.55, 3.55), V(-2.9, 0.85, 1.9)],
   garden: [V(0.4, 3.0, 8.6), V(0.6, 0.9, -0.6)],
-  picnic: [V(0.6, 2.6, 6.6), V(0.7, 0.9, -0.2)],
+  picnic: [V(0.5, 2.5, 6.0), V(0.6, 0.8, -0.4)],
 };
 let camBase = SHOTS.hooks[0].clone();
 function shot(name, dur = 1.2) {
@@ -395,9 +396,9 @@ function resize() {
   const asp = W / Hh;
   camera.aspect = asp;
   const hfov = 68 * Math.PI / 180;
-  camera.fov = clamp(2 * Math.atan(Math.tan(hfov / 2) / asp) * 180 / Math.PI, 38, 80);
+  camera.fov = clamp(2 * Math.atan(Math.tan(hfov / 2) / asp) * 180 / Math.PI, 38, asp < 1 ? 100 : 80);
   camera.updateProjectionMatrix();
-  const gw = Math.round(Math.min(W * 0.3, Hh * 0.44)), gh = Math.round(gw * 1.3);
+  const gw = Math.round(Math.min(W * (asp < 1 ? 0.4 : 0.26), Hh * 0.38)), gh = Math.round(gw * 1.3);
   gRect = { x: 0, y: 0, w: gw, h: gh };
   gCam.aspect = gw / gh; gCam.updateProjectionMatrix();
 }
@@ -608,6 +609,7 @@ async function toyTap(a) {
 }
 
 async function grow(a, dest, ry, hopH = 0.8) {
+  const S1 = a.finalScale || 1;
   a.waking = true;
   const p0 = a.root.position.clone(), s0 = a.root.scale.x, r0 = a.root.rotation.y;
   sfx('boing'); sparkle(p0, 10, 0.3);
@@ -618,10 +620,10 @@ async function grow(a, dest, ry, hopH = 0.8) {
   a.root.rotation.y = ry;
   puff(dest, 1.1); sfx('grow');
   await tween(1.1, (k) => {
-    a.root.scale.setScalar(s0 + (1 - s0) * ease.back(k));
+    a.root.scale.setScalar(s0 + (S1 - s0) * ease.back(k));
     if (k > 0.3 && !a.alive) { a.setMode('real'); a.alive = true; }
   }, ease.lin);
-  a.root.scale.setScalar(1); a.waking = false; a.watchCam = true;
+  a.root.scale.setScalar(S1); a.waking = false; a.watchCam = true;
 }
 
 async function wake1(a) {
@@ -759,7 +761,7 @@ async function fridgeOpen() {
 const lineup = { lion: [-1.1, 0.7, 0.25], tiger: [0.35, 0.95, 0], zebra: [1.8, 0.6, -0.35] };
 async function reveal(a) {
   if (!a.hidden || a.revealing) return;
-  a.revealing = true; busy++;
+  a.revealing = true;
   girlFace('surprised', 1.4); sfx('pop');
   if (a === lion) {
     sfx('swish');
@@ -790,7 +792,6 @@ async function reveal(a) {
   a.watchCam = true; a.face = 'idle';
   if (a === lion) { a.target.sit = 1; }
   found++;
-  busy--;
   a.revealing = false;
   if (found === 3) endSeek();
 }
@@ -876,7 +877,7 @@ async function wakeDino(a) {
 
 // ---------- パパのやらかし ----------
 const melons = [];
-const melonSpots = [V(3.5, 0, 2.55), V(-1.55, 0, -0.2), V(1.3, 0, 3.4)]; // 大・中・小 が転がっていく先
+const melonSpots = [V(4.3, 0, 2.2), V(-1.55, 0, -0.2), V(1.3, 0, 3.4)]; // 大・中・小 が転がっていく先
 const matSlots = [V(0.15, 0.012, 0.75), V(0.85, 0.012, 1.15), V(1.35, 0.012, 0.65)];
 async function dadScene() {
   state = 'dad'; busy++;
@@ -928,6 +929,7 @@ async function dadScene() {
   });
   sfx('roll');
   // しりもち
+  dad.sitting = true;
   await tween(0.4, (k) => { dad.hips.position.y = dad.legH * (1 - k * 0.72); dad.root.rotation.x = -0.5 + k * 0.5; dad.legs.forEach((l) => l.rotation.x = -k * 1.4); });
   dad.sitting = true; sfx('thud'); shake = 0.5;
   dad.setFace('dizzy');
@@ -940,7 +942,7 @@ async function dadScene() {
   // 看板が出てくる
   G.sign.visible = true; sfx('boing');
   await tween(0.7, (k) => G.sign.position.y = -2 + 2 * k, ease.back);
-  sparkle(V(2.75, 1.4, 1.5), 16, 0.6);
+  sparkle(V(4.75, 1.4, 0.5), 16, 0.6);
   girl.setFace('determined');
   dad.carry = false;
   busy--;
@@ -951,7 +953,7 @@ async function dadScene() {
 let selMelon = null, delivered = 0;
 const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.035, 8, 40), new THREE.MeshBasicMaterial({ color: 0xfff27a, transparent: true, opacity: 0.85 }));
 ring.rotation.x = -Math.PI / 2; ring.visible = false;
-const rightDino = [rex, trike, ptera];
+const rightDino = new Proxy([], { get: (t, i) => [rex, trike, ptera][i] });
 function startMelons() {
   state = 'melons';
   garden.add(ring);
@@ -1019,7 +1021,6 @@ async function giveTo(a) {
     return;
   }
   // 正解：恐竜がシートまで運ぶ
-  busy++;
   a.face = 'happy'; sfx('happy'); cheer(1.2);
   if (a === rex) { a.clap = false; sfx('rumble'); }
   if (a === trike) sfx('honk');
@@ -1056,7 +1057,6 @@ async function giveTo(a) {
   sparkle(slot.clone().add(V(0, 0.4, 0)), 16, 0.5);
   a.face = 'idle'; a.watchCam = true; a.busyGive = false;
   delivered++;
-  busy--;
   if (delivered === 3) picnic();
 }
 
@@ -1083,10 +1083,10 @@ async function picnic() {
   for (let i = 0; i < 6; i++) addSlice(i);
   sfx('happy');
   dad.armT[1] = { x: 0, z: 0 };
-  await walkTo(dad, 2.0, 2.4, 1.2, -0.3 + Math.PI);
+  await walkTo(dad, 3.1, 1.3, 1.2, -0.6);
   dad.setFace('happy');
   // 家の動物たちもやってくる
-  const come = [[lion, -2.0, 1.0, 0.6], [zebra, -1.6, -1.0, 0.7], [tiger, 2.2, 0.0, -0.6]];
+  const come = [[lion, -1.25, 1.35, 0.4], [zebra, -1.6, -1.0, 0.7], [tiger, 2.2, 0.0, -0.6]];
   come.forEach(([a, x, z], i) => { a.root.visible = true; a.root.position.set(-7 - i, 0, 1.5 - i); a.target = { sit: 0, lie: 0, rear: 0 }; });
   await Promise.all(come.map(([a, x, z, ry]) => walkTo(a, x, z, 2.2, ry)));
   sfx('roar'); setTimeout(() => sfx('whinny'), 400); setTimeout(() => sfx('purr'), 800);
@@ -1099,7 +1099,7 @@ async function picnic() {
   // 空をタップすると翼竜が飛ぶ
 }
 const sliceSlots = [];
-for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; sliceSlots.push(V(0.7 + Math.cos(a) * 0.3, 0.06, 0.95 + Math.sin(a) * 0.3)); }
+for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; sliceSlots.push(V(0.7 + Math.cos(a) * 0.36, 0.06, 0.95 + Math.sin(a) * 0.36)); }
 function addSlice(i) {
   const s = M.makeSlice(); s.position.copy(sliceSlots[i]); s.rotation.y = -i / 6 * Math.PI * 2 + Math.PI / 2; s.rotation.x = 0;
   s.children[0].rotation.x = -Math.PI / 2 + 0.25;
@@ -1108,7 +1108,7 @@ function addSlice(i) {
   garden.add(s); slices.push(s);
   proxy(s, 0.22, V(0, 0.05, 0));
   onTap(s, () => { if (s.userData.used) return; if (selSlice) selSlice.position.y = 0.06; selSlice = s; s.position.y = 0.3; sfx('pop'); sparkle(s.position, 6, 0.2); girlFace('happy', 0.8); });
-  s.scale.setScalar(0.01); tween(0.4, (k) => s.scale.setScalar(Math.max(0.01, k)), ease.back);
+  s.scale.setScalar(0.01); tween(0.4, (k) => s.scale.setScalar(Math.max(0.01, k * 1.7)), ease.back);
 }
 perFrame.add((dt, t) => { if (selSlice) { selSlice.position.y = 0.3 + Math.sin(t * 5) * 0.05; selSlice.rotation.y += dt * 2; } });
 
@@ -1123,7 +1123,7 @@ async function feedOrAct(a) {
   const hold = () => s.position.copy(target());
   perFrame.add(hold);
   a.face = 'eat'; sfx('munch');
-  for (let i = 0; i < 5; i++) { await wait(0.22); s.scale.setScalar(1 - (i + 1) / 6); if (i % 2) { sfx('seed'); particle(starTex, target(), V(Math.random() - 0.5, 1, Math.random() - 0.5), 0.6, 0.06, 0x332211, false); } }
+  for (let i = 0; i < 5; i++) { await wait(0.22); s.scale.setScalar(1.7 * (1 - (i + 1) / 6)); if (i % 2) { sfx('seed'); particle(starTex, target(), V(Math.random() - 0.5, 1, Math.random() - 0.5), 0.6, 0.06, 0x332211, false); } }
   perFrame.delete(hold);
   garden.remove(s); slices.splice(slices.indexOf(s), 1);
   a.face = 'happy'; sfx('happy'); sparkle(target(), 10, 0.4);
@@ -1172,7 +1172,7 @@ async function jump(j) {
   [lion, zebra, tiger].forEach((a) => fast(a, 0, 0, 0));
   goGarden();
   if (j === 'garden') return;
-  [trike, rex, ptera].forEach((a) => { const s = gSpots[a.kind]; fast(a, s.x, s.z, s.ry); });
+  [trike, rex, ptera].forEach((a) => { const s = gSpots[a.kind]; fast(a, s.x, s.z, s.ry); a.root.scale.setScalar(a.finalScale || 1); });
   ptera.root.position.y = 0.5; dinosAlive = 3; shot('garden', 0);
   if (j === 'dad') { await dadScene(); return; }
   if (j === 'melons' || j === 'picnic') {

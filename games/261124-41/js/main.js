@@ -1,6 +1,6 @@
 // main.js — boot, loader, frame loop, scene manager, debug hooks.
 import { L, layout, stageTransform, initInput, clamp, TAU, unitsToCss, getQuality, setQuality } from './engine.js';
-import { loadAssets } from './assets.js';
+import { loadAssets, sceneReady, whenSceneReady, sceneProgress, afterAll } from './assets.js';
 import { fx, hint, drawIris } from './fx.js';
 import { bubbles } from './bubbles.js';
 import { snd } from './snd.js';
@@ -30,7 +30,7 @@ let trans = null; // { k, dir, id, opts }
 let downDelivered = false;
 let bgmStarted = false;
 
-const debug = { get scene() { return game.id; }, get phase() { return game.phase; }, goto: (id) => go(id, { fade: false }), ready: false, toCss: unitsToCss,
+const debug = { get scene() { return game.id; }, get phase() { return game.phase; }, goto: (id) => whenSceneReady(id).then(() => go(id, { fade: false })), ready: false, toCss: unitsToCss,
   // for automated play-throughs: where the hint currently points
   hint: () => { const s = hint.spec; return s ? { type: s.type, x: hint.pos(s.x), y: hint.pos(s.y), x2: s.x2 != null ? hint.pos(s.x2) : null, y2: s.y2 != null ? hint.pos(s.y2) : null, r: s.r || 80 } : null; },
   get block() { return game.block; } };
@@ -157,7 +157,12 @@ function update(dt) {
   if (!loaded) return;
   if (trans) {
     trans.k += (dt / 0.3) * trans.dir;
-    if (trans.dir > 0 && trans.k >= 1) { trans.k = 1; trans.dir = -1; switchTo(trans.id, trans.opts); }
+    if (trans.dir > 0 && trans.k >= 1) {
+      trans.k = 1;
+      // the next scene's pictures are still streaming in: stay behind the closed iris with the loader
+      if (!sceneReady(trans.id)) { trans.wait = (trans.wait || 0) + dt; loadK = sceneProgress(trans.id); }
+      else { trans.wait = 0; trans.dir = -1; switchTo(trans.id, trans.opts); }
+    }
     else if (trans.dir < 0 && trans.k <= 0) trans = null;
   }
   game.clock.update(dt);
@@ -186,6 +191,9 @@ function render() {
   fx.drawSteam(ctx, 'over');
   if (s && s.drawOverlay) s.drawOverlay(ctx);
   if (trans) drawIris(ctx, clamp(trans.k, 0, 1));
+  if (trans && trans.wait > 0.25) {
+    ctx.save(); ctx.globalAlpha = Math.min(1, (trans.wait - 0.25) / 0.3); drawLoader(); ctx.restore();
+  }
   fx.drawRipples(ctx);
 }
 
@@ -221,11 +229,18 @@ window.addEventListener('pageshow', () => { if (!running && !document.hidden) { 
 
 raf = requestAnimationFrame(frame);
 fx.init();
+// the cut-scene video is fetched only after every picture, so it never competes with the first screen
+afterAll(() => {
+  const v = document.getElementById('v');
+  if (v && v.preload !== 'auto') { v.preload = 'auto'; if (v.readyState === 0 && v.networkState !== 2) v.load(); }
+});
 loadAssets((k) => { loadK = k; }).then(() => {
-  loaded = true;
-  layKey = layoutKey();
   const want = game.params.get('scene');
   const first = want && ORDER.includes(want) ? want : 'title';
+  return whenSceneReady(first).then(() => first);
+}).then((first) => {
+  loaded = true;
+  layKey = layoutKey();
   switchTo(first, {});
   trans = { k: 1, dir: -1, id: first, opts: {} };
   debug.ready = true;

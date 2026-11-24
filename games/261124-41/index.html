@@ -7,6 +7,32 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#2a1c12">
 <title>おてつだいカレー</title>
+<link rel="preload" href="assets/hero_curry.webp" as="image" fetchpriority="high">
+<link rel="preload" href="assets/girl_smile.webp" as="image">
+<link rel="modulepreload" href="js/main.js">
+<link rel="modulepreload" href="js/engine.js">
+<link rel="modulepreload" href="js/assets.js">
+<link rel="modulepreload" href="js/placeholders.js">
+<link rel="modulepreload" href="js/fx.js">
+<link rel="modulepreload" href="js/bubbles.js">
+<link rel="modulepreload" href="js/snd.js">
+<link rel="modulepreload" href="js/game.js">
+<link rel="modulepreload" href="js/layout.js">
+<link rel="modulepreload" href="js/shapes.js">
+<link rel="modulepreload" href="js/sprite.js">
+<link rel="modulepreload" href="js/plate.js">
+<link rel="modulepreload" href="js/potview.js">
+<link rel="modulepreload" href="js/video.js">
+<link rel="modulepreload" href="js/scenes/cut.js">
+<link rel="modulepreload" href="js/scenes/eat.js">
+<link rel="modulepreload" href="js/scenes/end.js">
+<link rel="modulepreload" href="js/scenes/home.js">
+<link rel="modulepreload" href="js/scenes/pot.js">
+<link rel="modulepreload" href="js/scenes/roux.js">
+<link rel="modulepreload" href="js/scenes/serve.js">
+<link rel="modulepreload" href="js/scenes/stamp.js">
+<link rel="modulepreload" href="js/scenes/title.js">
+<link rel="modulepreload" href="js/scenes/wash.js">
 <style>
   html, body {
     margin: 0; padding: 0; height: 100%; overflow: hidden; background: #2a1c12;
@@ -32,7 +58,7 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<video id="v" muted playsinline webkit-playsinline preload="auto" disablepictureinpicture disableremoteplayback src="assets/curry-stir.mp4"></video>
+<video id="v" muted playsinline webkit-playsinline preload="none" disablepictureinpicture disableremoteplayback src="assets/curry-stir.mp4"></video>
 <div id="safe"></div>
 <script type="module" src="js/main.js"></script>
 </body>

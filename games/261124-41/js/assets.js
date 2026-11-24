@@ -73,30 +73,133 @@ function loadImg(url) {
   });
 }
 
+// Load order. The title needs only two pictures; everything else streams in behind it while the
+// player looks at the title (and plays the home scene). A scene is entered only once its group and
+// every earlier group are decoded, so no scene ever caches a placeholder.
+export const GROUPS = [
+  ['title', ['hero_curry', 'girl_smile']],
+  ['home', ['bg_counter', 'basket', 'carrot', 'potato', 'onion', 'mama_tired', 'mama_smile', 'girl_focus', 'girl_wow', 'girl_happy']],
+  ['wash', ['bowl_water']],
+  ['cut', ['board', 'knife', 'mama_wow', 'carrot_slice_1', 'carrot_slice_2', 'carrot_slice_3',
+    'potato_chunk_1', 'potato_chunk_2', 'potato_chunk_3', 'potato_chunk_4',
+    'onion_wedge_1', 'onion_wedge_2', 'onion_wedge_3', 'onion_wedge_4']],
+  ['stamp', ['carrot_flower', 'carrot_star', 'carrot_heart', 'pot']],
+  ['pot', ['bg_stove', 'lid', 'dish', 'jug', 'tex_curry', 'meat_raw_1', 'meat_raw_2', 'meat_raw_3',
+    'meat_cooked_1', 'meat_cooked_2', 'meat_cooked_3']],
+  ['roux', ['roux_1', 'roux_2', 'roux_3', 'roux_4', 'roux_tray', 'spatula']],
+  // last group: whatever is left (plates, table, toppings, anything only the manifest lists)
+  ['serve', []],
+];
+const GROUP_IDS = GROUPS.map((g) => g[0]);
+
+const fin = {};       // name -> true once settled (loaded or failed)
+const settled = {};   // name -> Promise (resolves once the file is decoded or has failed)
+let manifestP = null;
+let groupP = [];      // per group: Promise resolving when that group (and all before it) is ready
+const groupDone = [];
+let allNames = [];
+
+function fetchManifest() {
+  if (!manifestP) {
+    manifestP = fetch('assets/manifest.json', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null)
+      .then((m) => { manifest = m; return entriesOf(m); });
+  }
+  return manifestP;
+}
+
+// decode one image; its contact shadow is baked right after so no frame pays for it later
+function loadOne(n, ents) {
+  if (settled[n]) return settled[n];
+  meta[n] = ents[n] || meta[n] || {};
+  const want = ents[n] || REQUIRED.includes(n);
+  settled[n] = (want ? loadImg(fileUrl(n, ents[n])) : Promise.resolve(null)).then((im) => {
+    if (im) { imgs[n] = im; real[n] = true; }
+    else if (REQUIRED.includes(n)) imgs[n] = placeholder(n);
+    fin[n] = true;
+    if (imgs[n] && !NO_SHADOW.test(n)) shadows[n] = bakeShadow(imgs[n]);
+    else delete shadows[n];
+  });
+  return settled[n];
+}
+
+// small queue: earlier groups get the bandwidth first
+function queue(names, ents, conc) {
+  let i = 0;
+  const worker = () => (i < names.length ? loadOne(names[i++], ents).then(worker) : Promise.resolve());
+  return Promise.all(Array.from({ length: Math.min(conc, names.length) }, worker));
+}
+
+/** Resolves as soon as the title can be shown; the rest keeps loading in the background. */
 export async function loadAssets(onProgress) {
-  try {
-    const r = await fetch('assets/manifest.json', { cache: 'no-store' });
-    manifest = r.ok ? await r.json() : null;
-  } catch (e) { manifest = null; }
-  const ents = entriesOf(manifest);
+  // the two title pictures start downloading together with the manifest (default file names)
+  const first = GROUPS[0][1];
+  const early = first.map((n) => loadImg(fileUrl(n, null)));
+  const ents = await fetchManifest();
   const names = new Set(REQUIRED);
   for (const n of OPTIONAL) if (ents[n]) names.add(n);
   for (const n in ents) {
     const f = String(ents[n].file || ents[n].src || ents[n].path || '');
     if (!/\.(mp3|mp4|json|m4a|ogg|wav)$/i.test(f)) names.add(n);
   }
+  for (const n of names) meta[n] = ents[n] || {};
+  allNames = [...names];
+  // title group: reuse the early downloads when the manifest agrees on the file
   let done = 0;
-  const list = [...names];
-  await Promise.all(list.map(async (n) => {
-    meta[n] = ents[n] || {};
-    const im = ents[n] || REQUIRED.includes(n) ? await loadImg(fileUrl(n, ents[n])) : null;
-    if (im) { imgs[n] = im; real[n] = true; }
-    done++;
-    if (onProgress) onProgress(done / list.length);
+  await Promise.all(first.map((n, i) => {
+    if (fileUrl(n, ents[n]) === fileUrl(n, null)) {
+      settled[n] = early[i].then((im) => {
+        if (im) { imgs[n] = im; real[n] = true; } else imgs[n] = placeholder(n);
+        fin[n] = true;
+      });
+    }
+    return loadOne(n, ents).then(() => { done++; if (onProgress) onProgress(done / first.length); });
   }));
-  for (const n of REQUIRED) if (!imgs[n]) imgs[n] = placeholder(n);
-  composePlates();
-  for (const n in imgs) if (!NO_SHADOW.test(n)) shadows[n] = bakeShadow(imgs[n]);
+  groupDone[0] = true;
+  groupP[0] = Promise.resolve();
+  // background: one group after another, a few files at a time
+  const seen = new Set(first);
+  let prev = groupP[0];
+  for (let g = 1; g < GROUPS.length; g++) {
+    const last = g === GROUPS.length - 1;
+    const list = (last ? allNames : GROUPS[g][1]).filter((n) => !seen.has(n));
+    list.forEach((n) => seen.add(n));
+    prev = prev.then(() => queue(list, ents, 4)).then(() => {
+      if (last) {
+        for (const n of REQUIRED) if (!imgs[n]) imgs[n] = placeholder(n);
+        composePlates();
+        for (const n of ['plate_rice', 'plate_full']) if (imgs[n]) shadows[n] = bakeShadow(imgs[n]);
+      }
+      groupDone[g] = true;
+    });
+    groupP[g] = prev;
+  }
+  prev.then(() => { if (onAll) onAll(); });
+}
+
+let onAll = null;
+/** Called once when every file has been loaded (used to start the cut-scene video download). */
+export function afterAll(fn) { onAll = fn; }
+
+function groupIndex(sceneId) {
+  const i = GROUP_IDS.indexOf(sceneId);
+  return i < 0 ? GROUPS.length - 1 : i;
+}
+/** true when the scene can be entered right now */
+export function sceneReady(sceneId) { return !!groupDone[groupIndex(sceneId)]; }
+/** resolves when the scene can be entered */
+export function whenSceneReady(sceneId) {
+  const p = groupP[groupIndex(sceneId)];
+  return p || new Promise((res) => { const t = setInterval(() => { const q = groupP[groupIndex(sceneId)]; if (q) { clearInterval(t); q.then(res); } }, 50); });
+}
+/** 0..1 loading progress of everything a scene needs (for the waiting spinner) */
+export function sceneProgress(sceneId) {
+  const gi = groupIndex(sceneId);
+  let need = [];
+  for (let g = 0; g <= gi; g++) need = need.concat(g === GROUPS.length - 1 ? allNames : GROUPS[g][1]);
+  need = [...new Set(need)];
+  if (!need.length) return 0;
+  return need.filter((n) => fin[n]).length / need.length;
 }
 
 // Plate set: either three registered full images, or plate_empty + overlay layers.

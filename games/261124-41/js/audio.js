@@ -1,5 +1,5 @@
 // audio.js — synthesised kitchen sound effects + BGM for "helping Mama cook curry".
-// ES module, no dependencies. Everything is a safe no-op before audio.unlock()
+// ES module; asks assets.js only when to start downloading the music. Everything is a safe no-op before audio.unlock()
 // or when Web Audio is unavailable.
 //
 // Musical one-shots use the C-major pentatonic set (C D E G A). Analysis of
@@ -7,6 +7,8 @@
 // pitch classes with a C-major tonic (some passing F# / G# from secondary
 // dominants), so C pentatonic fits without transposition (it is also a subset
 // of G major, the closest neighbouring key).
+
+import { whenSceneReady } from './assets.js';
 
 const AC = typeof window !== 'undefined' ? (window.AudioContext || window.webkitAudioContext) : null;
 
@@ -812,8 +814,10 @@ function loadBuffer(rel) {
 function startLoading() {
   if (loadStarted || !ctx) return;
   loadStarted = true;
-  loadBuffer('../assets/bgm.mp3').then((b) => { bgmBuf = b; if (b && bgmWanted && !bgmSrc) startBgmNow(); });
-  loadBuffer('../assets/stir-audio.mp3').then((b) => { stirBuf = b; });
+  // the music waits until the home scene's pictures are in, the stir sound until the pot scene's,
+  // so neither slows down the first screens on a slow connection
+  whenSceneReady('home').then(() => loadBuffer('../assets/bgm.mp3')).then((b) => { bgmBuf = b; if (b && bgmWanted && !bgmSrc) startBgmNow(); });
+  whenSceneReady('pot').then(() => loadBuffer('../assets/stir-audio.mp3')).then((b) => { stirBuf = b; });
 }
 
 function startBgmNow() {

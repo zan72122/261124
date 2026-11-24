@@ -101,7 +101,7 @@ let allNames = [];
 
 function fetchManifest() {
   if (!manifestP) {
-    manifestP = fetch('assets/manifest.json', { cache: 'no-store' })
+    manifestP = fetch('assets/manifest.json')
       .then((r) => (r.ok ? r.json() : null)).catch(() => null)
       .then((m) => { manifest = m; return entriesOf(m); });
   }

@@ -45,9 +45,10 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', resi
 resize();
 
 // audio unlock must happen inside a user gesture: first pointerup AND touchend
-let warmed = false;
+// (the video is warmed on the first gesture after all pictures are in, so it never competes with them)
+let warmed = false, picturesIn = false;
 const unlock = () => {
-  if (!warmed) { warmed = true; warmVideo(); }
+  if (!warmed && picturesIn) { warmed = true; warmVideo(); }
   snd.unlock().then(() => {
     if (!bgmStarted && game.id && game.id !== 'title') { bgmStarted = true; snd.bgmStart(); }
   });
@@ -231,6 +232,7 @@ raf = requestAnimationFrame(frame);
 fx.init();
 // the cut-scene video is fetched only after every picture, so it never competes with the first screen
 afterAll(() => {
+  picturesIn = true;
   const v = document.getElementById('v');
   if (v && v.preload !== 'auto') { v.preload = 'auto'; if (v.readyState === 0 && v.networkState !== 2) v.load(); }
 });

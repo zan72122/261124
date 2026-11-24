@@ -1185,6 +1185,7 @@ const SHOTS = {
   dress: { look: [-1.08, 0.66, 0.9], dir: [0.05, 0.3, 1], fitW: 0.78, fitH: 0.55 },
   boxWide: { look: [-2.4, 0.8, 0.5], dir: [0.12, 0.3, 1], fitW: 2.3, fitH: 1.2 },
   box: { look: [-1.9, 0.75, 0.55], dir: [0.06, 0.75, 1], fitW: 1.05, fitH: 0.72 },
+  boxMeet: { look: [-1.75, 0.7, 0.9], dir: [0.05, 0.22, 1], fitW: 1.45, fitH: 0.82 },
   boxRise: { look: [-1.75, 0.95, 0.6], dir: [0.1, 0.25, 1], fitW: 1.2, fitH: 0.85 },
   living: { look: [-2.35, 0.7, -1.7], dir: [0.0, 0.34, 1], fitW: 3.0, fitH: 1.45 },
   kitchen: { look: [3.0, 0.88, -3.38], dir: [0.0, 1.45, 1], fitW: 0.9, fitH: 0.52 },
@@ -1416,7 +1417,8 @@ async function sceneDress() {
 async function sceneBox(dressStuff) {
   // dad arrives with the box
   if (dressStuff) { dressStuff.holders.forEach((h) => scene.remove(h)); scene.remove(dressStuff.stand); }
-  girl.walkTo(-1.08, 0.62, 1.0, -0.9);
+  robot.root.visible = true;
+  girl.walkTo(-1.08, 0.62, 1.0, -0.45);
   shot(SHOTS.boxWide, 1.6);
   SFX.doorbell();
   girl.say('wow', 1.5);
@@ -1456,7 +1458,7 @@ async function sceneBox(dressStuff) {
   await wait(1.2);
   // glint the tapes & go close
   shot(SHOTS.box, 2);
-  girl.face(box.g.position);
+  girl.faceY = -0.45;
   inputEnabled = true;
   setHandMode('hand');
   const glint = (dt) => { for (const tp of box.tapes) if (!tp.done) tp.laid.material.emissive.setRGB(0.25 + Math.sin(T * 5) * 0.2, 0.18 + Math.sin(T * 5) * 0.15, 0.05); };
@@ -1504,6 +1506,7 @@ async function sceneBox(dressStuff) {
       girl.say('wow', 0.8);
     },
   }));
+  if (params.has('fastbox')) { box.tapes.forEach((tp) => { box.setTape(tp, 1); finishTape(tp); }); }
   await until(() => tapesDone >= 3);
   updaters.splice(updaters.indexOf(glint), 1);
   clearIdleHint();
@@ -1511,6 +1514,7 @@ async function sceneBox(dressStuff) {
   // flaps glow
   const fglint = (dt) => { for (const f of box.flaps) { const m = f.m.material[2]; } };
   setIdleHint(() => { const f = box.flaps.find((ff, i) => ff.target === 0 && (i >= 2 || (box.flaps[2].target && box.flaps[3].target))); if (!f) return null; const v = new THREE.Vector3(); f.m.getWorldPosition(v); return v; }, null, 3);
+  if (params.has('fastbox')) { box.flaps.forEach((f) => (f.target = 1)); opened = 4; }
   await until(() => opened >= 4);
   clearIdleHint();
   inputEnabled = false;
@@ -1533,12 +1537,12 @@ async function sceneBox(dressStuff) {
   await wait(1.6);
   // hop out of the box
   SFX.whoosh();
-  const from = robot.root.position.clone(), to = new THREE.Vector3(-1.75, 0, 1.15);
+  const from = robot.root.position.clone(), to = new THREE.Vector3(-1.75, 0, 1.2);
   robot.faceY = 0.3;
   await tween(0.7, (k) => { robot.root.position.lerpVectors(from, to, k); robot.root.position.y = lerp(from.y, 0, k) + Math.sin(k * Math.PI) * 0.45; });
   SFX.thud(); cam.shake = 0.2;
-  robot.face(girl.root.position);
-  girl.face(robot.root.position);
+  shot(SHOTS.boxMeet, 1.8);
+  robot.faceY = 0.55; girl.faceY = -0.9; dad.faceY = 1.2;
   await wait(0.3);
   robot.setExpr('love'); SFX.beepHappy(); robot.play('wave', 2);
   burst(robot.head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.3, 0)), heartTex, 6, { size: 0.12, speed: 0.6, g: -0.3, life: 1.6 });

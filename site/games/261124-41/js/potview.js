@@ -10,7 +10,7 @@ export const POT = { x: 500, y: 415, outerR: 350 };
 
 // pot (≈700 outer diameter) fills the short side; dishes / jug / roux dish go in the free band
 export function planPot() {
-  const F = frame({ w: 842, h: 800 }, ['meat', 'onion', 'potato', 'carrot'], { sec: 230, minSec: 210 });
+  const F = frame({ w: 842, h: 800 }, ['meat', 'onion', 'potato', 'carrot'], { sec: 230, minSec: 210, chef: true });
   POT.x = F.px; POT.y = F.py; POT.outerR = 350 * F.k;
   const side = F.mode === 'side';
   const right = slotCentre(F, ['potato', 'carrot']);
@@ -204,10 +204,14 @@ export function drawPot(ctx, pv) {
   spr(ctx, 'pot', g.x, g.y, g.w, { sa: 1.1 });
   ctx.save();
   clipInner(ctx, g);
-  for (const p of pv.pieces) if (!p.float && p.inPot !== false) drawPiece(ctx, pv, p);
-  if (pv.water > 0) drawWater(ctx, pv);
-  if (pv.broth > 0) drawBroth(ctx, pv);
-  if (pv.mix) drawMix(ctx, pv);
+  // once the chunky curry is fully set it covers the whole inside opaquely: what lies under it is skipped
+  const covered = !!(pv.mix && pv.mix.full && pv.mix.thick >= 1);
+  if (!covered) {
+    for (const p of pv.pieces) if (!p.float && p.inPot !== false) drawPiece(ctx, pv, p);
+    if (pv.water > 0) drawWater(ctx, pv);
+    if (pv.broth > 0) drawBroth(ctx, pv);
+  }
+  if (pv.mix) drawMix(ctx, pv, covered);
   for (const p of pv.pieces) if (p.float && p.inPot !== false) drawPiece(ctx, pv, p);
   drawSurface(ctx, pv);
   // the pot wall darkens toward the rim
@@ -394,17 +398,19 @@ function drawTex(c, ang, D) {
   c.restore();
 }
 
-function drawMix(ctx, pv) {
+function drawMix(ctx, pv, covered) {
   const m = pv.mix, g = pv.g;
   const x0 = g.ix - g.ir, y0 = g.iy - g.ir, d = g.ir * 2;
   // texture side ≈ 1.1 × the inner diameter: chunks match the real pieces, circle stays covered
   const D = CS * 1.1;
   if (m.full) {
     // mask is solid: draw the layers straight through the pot's inner clip, no masking passes
-    const sc = sauce();
-    ctx.drawImage(sc, x0, y0, d, d);
-    // drawn twice: thin ribbons already read as brown sauce instead of a pale tint
-    ctx.drawImage(sc, x0, y0, d, d);
+    if (!covered) {
+      const sc = sauce();
+      ctx.drawImage(sc, x0, y0, d, d);
+      // drawn twice: thin ribbons already read as brown sauce instead of a pale tint
+      ctx.drawImage(sc, x0, y0, d, d);
+    }
     if (m.thick > 0.005) {
       ctx.save();
       ctx.globalAlpha = Math.min(1, m.thick);

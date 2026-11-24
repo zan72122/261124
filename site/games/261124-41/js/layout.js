@@ -35,15 +35,18 @@ export function frame(prim, items = [], o = {}) {
     else {
       const bw = sideW(k);
       const d = Math.max(mb, Math.min(want, bw - 2 * M));
+      // o.chef: the girl is shown whole at her pot, so her window gets more room than the portrait
+      const dg = o.chef ? Math.max(d, Math.min(want * 1.4, bw - 2 * M)) : d;
       out.mode = 'side'; out.k = k; out.px = E.cx; out.py = E.cy;
       out.bub = {
         mama: { x: E.x0 + bw / 2, y: E.y0 + M + d / 2, d },
-        girl: { x: E.x1 - bw / 2, y: E.y0 + M + d / 2, d },
+        girl: { x: E.x1 - bw / 2, y: E.y0 + M + dg / 2, d: dg },
       };
       const left = o.left || items.slice(0, Math.ceil(n / 2));
       const right = o.right || items.filter((x) => !left.includes(x));
-      const top = E.y0 + 2 * M + d, bot = E.y1 - M;
-      for (const [list, cx] of [[left, E.x0 + bw / 2], [right, E.x1 - bw / 2]]) {
+      const bot = E.y1 - M;
+      for (const [list, cx, dd] of [[left, E.x0 + bw / 2, d], [right, E.x1 - bw / 2, dg]]) {
+        const top = E.y0 + 2 * M + dd;
         const m = list.length;
         if (!m) continue;
         const s = Math.min(sec * 1.05, bw - 2 * M, (bot - top - (m - 1) * M) / m);
@@ -56,8 +59,12 @@ export function frame(prim, items = [], o = {}) {
   }
   // vertical: bubbles in the top band, primary below, secondaries in a row under it
   const d = Math.max(mb, Math.min(want, (E.w - 3 * M) / 2.2));
-  const topBand = d + 2 * M;
   const needRow = n ? minSec + 2 * M : 0;
+  // o.chef: the girl's window grows (up to 1.25x) only into height nobody else needs
+  const k0 = Math.min(1, (E.w - 2 * M) / prim.w);
+  const spare = E.h - (d + 2 * M) - prim.h * k0 - needRow;
+  const dg = o.chef ? d + Math.max(0, Math.min(d * 0.25, E.w - 4 * M - 2 * d, spare)) : d;
+  const topBand = dg + 2 * M;
   let k = Math.min(1, (E.w - 2 * M) / prim.w);
   if (E.h - topBand - prim.h * k < needRow) k = Math.max(o.minK ?? 0.6, (E.h - topBand - needRow) / prim.h);
   const hh = prim.h * k;
@@ -66,8 +73,8 @@ export function frame(prim, items = [], o = {}) {
   const y0 = E.y0 + topBand + Math.max(0, (E.h - topBand - group) / 2);
   out.mode = 'below'; out.k = k; out.px = E.cx; out.py = y0 + hh / 2;
   out.bub = {
-    mama: { x: E.x0 + M + d / 2, y: E.y0 + M + d / 2, d },
-    girl: { x: E.x1 - M - d / 2, y: E.y0 + M + d / 2, d },
+    mama: { x: E.x0 + M + d / 2, y: E.y0 + M + dg / 2, d },
+    girl: { x: E.x1 - M - dg / 2, y: E.y0 + M + dg / 2, d: dg },
   };
   const step = n ? Math.min((E.w - 2 * M) / n, rowS * 1.25) : 0;
   const rowY = y0 + hh + M + rowS / 2;

@@ -3,7 +3,11 @@ let A = null;
 const NOOP_LOOP = { set() {}, stop() {} };
 const safe = (fn, fb) => { try { return A ? fn() : fb; } catch (e) { return fb; } };
 
-export const loaded = import('./audio.js').then((m) => { A = m.audio || m.default || null; }).catch(() => { A = null; });
+let wantMuted = null;   // a mute asked for before the module arrived (?mute=1 is read at boot)
+export const loaded = import('./audio.js').then((m) => {
+  A = m.audio || m.default || null;
+  if (A && wantMuted != null) { try { A.setMuted(wantMuted); } catch (e) { /* ignore */ } }
+}).catch(() => { A = null; });
 
 let unlocked = false;
 export const snd = {
@@ -22,5 +26,5 @@ export const snd = {
   bgmDuck(level, sec) { safe(() => A.bgm.duck(level, sec)); },
   bgmStop(sec) { safe(() => A.bgm.stop(sec)); },
   playStir() { return safe(() => A.playStir(), null) || { stop() {} }; },
-  setMuted(m) { safe(() => A.setMuted(m)); },
+  setMuted(m) { wantMuted = !!m; safe(() => A.setMuted(m)); },
 };

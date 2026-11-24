@@ -90,12 +90,24 @@ export const GROUPS = [
   // last group: whatever is left (plates, table, toppings, anything only the manifest lists)
   ['serve', []],
 ];
+// the girl at her pot (sprite-girl/, 100 frames) streams in on her own, next to the scene groups, so
+// she never holds up the home scene (which does not show her). Order: the stirring loop (she takes over
+// the title from her portrait as soon as it is in), the giggle, the curry stirring, then the rest.
+// The pot scene is the first one that needs all of her, so it waits for the whole set.
+export const CHEF_N = 100;
+export const chefName = (i) => 'girl_f' + String(i).padStart(3, '0');
+const chefRange = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => chefName(a + i));
+const CHEF_ORDER = [...new Set([...chefRange(0, 27), ...chefRange(54, 61), ...chefRange(72, 96), ...chefRange(0, CHEF_N - 1)])];
+const CHEF_GATE = 'pot';
+// parallel downloads: scene groups / the girl's frames
+const MAIN_CONC = 3, CHEF_CONC = 3;
 const GROUP_IDS = GROUPS.map((g) => g[0]);
 
 const fin = {};       // name -> true once settled (loaded or failed)
 const settled = {};   // name -> Promise (resolves once the file is decoded or has failed)
 let manifestP = null;
-let groupP = [];      // per group: Promise resolving when that group (and all before it) is ready
+let groupP = [];
+let chefNames = [];      // per group: Promise resolving when that group (and all before it) is ready
 const groupDone = [];
 let allNames = [];
 
@@ -104,6 +116,19 @@ function fetchManifest() {
     manifestP = fetch('assets/manifest.json')
       .then((r) => (r.ok ? r.json() : null)).catch(() => null)
       .then((m) => { manifest = m; return entriesOf(m); });
+    // frames of the girl sprite, described by their own small manifest
+    const chefP = fetch('assets/sprite-girl/manifest.json')
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    manifestP = Promise.all([manifestP, chefP]).then(([ents, cm]) => {
+      if (cm && cm.pattern) {
+        const n = Math.min(CHEF_N, cm.frames || 0);
+        for (let i = 0; i < n; i++) {
+          const f = cm.pattern.replace(/%0(\d)d/, (_, w) => String(i).padStart(+w, '0'));
+          ents[chefName(i)] = { file: 'sprite-girl/' + f };
+        }
+      }
+      return ents;
+    });
   }
   return manifestP;
 }
@@ -157,14 +182,20 @@ export async function loadAssets(onProgress) {
   }));
   groupDone[0] = true;
   groupP[0] = Promise.resolve();
-  // background: one group after another, a few files at a time
+  // background: the girl's frames stream alongside the scene groups
   const seen = new Set(first);
-  let prev = groupP[0];
+  chefNames = CHEF_ORDER.filter((n) => ents[n]);
+  chefNames.forEach((n) => seen.add(n));
+  const chefP = queue(chefNames, ents, CHEF_CONC);
+  // downloads run group after group; a group counts as ready once it and every earlier group are in
+  // (the pot group also waits for the girl, without holding up the downloads after it)
+  let dl = groupP[0];
   for (let g = 1; g < GROUPS.length; g++) {
     const last = g === GROUPS.length - 1;
     const list = (last ? allNames : GROUPS[g][1]).filter((n) => !seen.has(n));
     list.forEach((n) => seen.add(n));
-    prev = prev.then(() => queue(list, ents, 4)).then(() => {
+    dl = dl.then(() => queue(list, ents, MAIN_CONC));
+    groupP[g] = Promise.all([dl, groupP[g - 1], GROUPS[g][0] === CHEF_GATE ? chefP : null]).then(() => {
       if (last) {
         for (const n of REQUIRED) if (!imgs[n]) imgs[n] = placeholder(n);
         composePlates();
@@ -172,8 +203,8 @@ export async function loadAssets(onProgress) {
       }
       groupDone[g] = true;
     });
-    groupP[g] = prev;
   }
+  const prev = groupP[GROUPS.length - 1];
   prev.then(() => { if (onAll) onAll(); });
 }
 
@@ -196,7 +227,7 @@ export function whenSceneReady(sceneId) {
 export function sceneProgress(sceneId) {
   const gi = groupIndex(sceneId);
   let need = [];
-  for (let g = 0; g <= gi; g++) need = need.concat(g === GROUPS.length - 1 ? allNames : GROUPS[g][1]);
+  for (let g = 0; g <= gi; g++) need = need.concat(g === GROUPS.length - 1 ? allNames : GROUPS[g][1], GROUPS[g][0] === CHEF_GATE ? chefNames : []);
   need = [...new Set(need)];
   if (!need.length) return 0;
   return need.filter((n) => fin[n]).length / need.length;

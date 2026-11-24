@@ -5,6 +5,7 @@ import { spr, shadow } from '../sprite.js';
 import { size, geo, img } from '../assets.js';
 import { fx, hint } from '../fx.js';
 import { bubbles } from '../bubbles.js';
+import { chef, IDLE } from '../chef.js';
 import { snd } from '../snd.js';
 import { game, phase, wait, anim } from '../game.js';
 import { POT, planPot, createPot, fillPot, drawStove, drawPot, initMix, mixRotate, mixDeposit, mixRaise, mixFill, mixMeasure } from '../potview.js';
@@ -73,6 +74,7 @@ export default function roux(carry) {
     }).then(() => {
       b.h = 0; b.inPot = true; b.sq.kick(4);
       snd.sfx('plop');
+      chef.react();
       pv.ripple(b.x, b.y, 1.2, 1.2);
       fx.drops(b.x, b.y, 8, 'rgba(240,200,120,0.95)', 220);
     });
@@ -120,6 +122,7 @@ export default function roux(carry) {
     spat.target = 0;
     anim(0.5, (k) => { spat.vis = 1 - k; spat.h = k * 200; });
     fx.sparkle(g.ix, g.iy, 20, g.ir);
+    chef.play('wink');
     bubbles.girl.setFace('girl_wow'); bubbles.girl.jump(1);
     bubbles.mama.setFace('mama_wow'); bubbles.mama.jump(0.8);
     snd.sfx('girl', { mood: 'wow' });
@@ -185,6 +188,8 @@ export default function roux(carry) {
     } else {
       L('stir').set(0, 0.25);
     }
+    // the girl stirs her pot along with the finger: slowly while waiting, up to twice her pace
+    if (step === 'stir') chef.setSpeed(0.35 + energy * 1.75);
     m.texAng += dt * 0.02;
     // roux blocks dissolve (faster while stirring) and bleed a brown cloud
     for (const b of blocks) {
@@ -219,6 +224,8 @@ export default function roux(carry) {
       bubbles.setHomes(F.bub);
       bubbles.mama.show('mama_smile'); bubbles.girl.show('girl_wow');
       L('flame').set(0.6, 0.4); L('simmer').set(0.6, 0.6);
+      // the soup in her pot turns into curry here too
+      chef.idle(IDLE.curry, 0.5);
       pv.water = 0;
       trayIn();
     },

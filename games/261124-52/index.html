@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#cfe7fb">
+<title>だんボールひこうき</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#cfe7fb;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+canvas{display:block;width:100vw;height:100vh;height:100dvh;touch-action:none}
+#fade{position:fixed;inset:0;background:#fff;opacity:1;pointer-events:none;transition:opacity .6s}
+#hand{position:fixed;left:0;top:0;width:84px;height:84px;margin:-6px 0 0 -26px;pointer-events:none;opacity:0;transition:opacity .3s;filter:drop-shadow(0 4px 4px rgba(0,0,0,.35));z-index:5}
+.ripple{position:fixed;width:70px;height:70px;margin:-35px 0 0 -35px;border-radius:50%;border:5px solid rgba(255,255,255,.9);pointer-events:none;animation:rip .45s ease-out forwards;z-index:4}
+@keyframes rip{from{transform:scale(.3);opacity:1}to{transform:scale(1.3);opacity:0}}
+#start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:6}
+#start button{width:180px;height:180px;border-radius:50%;border:0;background:#ffb627;box-shadow:0 10px 0 #c97f00,0 14px 30px rgba(0,0,0,.25);animation:pul 1.2s ease-in-out infinite;padding:0;cursor:pointer}
+#start button:active{transform:translateY(6px);box-shadow:0 4px 0 #c97f00}
+@keyframes pul{50%{transform:scale(1.08)}}
+#again{position:fixed;left:14px;top:14px;width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.75);display:none;z-index:6;padding:0;border:0}
+#again svg{position:absolute;inset:0}
+@media (prefers-reduced-motion:reduce){#start button{animation:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="fade"></div>
+<svg id="hand" viewBox="0 0 64 64"><path d="M22 6c3 0 5 2 5 5v17l2-1c2-1 5 0 6 2l1 1 2-1c2-1 5 0 6 2l1 1c2-1 5 0 6 2 1 1 1 2 1 3v10c0 9-6 15-15 15h-4c-6 0-10-3-13-8L10 39c-1-2 0-5 2-6s5-1 6 1l2 3V11c0-3 1-5 2-5z" fill="#fff" stroke="#333" stroke-width="3" stroke-linejoin="round"/></svg>
+<div id="start"><button id="go" aria-label="start"><svg viewBox="0 0 100 100" width="120" height="120"><path d="M50 10 L58 40 L92 52 L92 60 L58 54 L56 78 L68 86 L68 92 L50 87 L32 92 L32 86 L44 78 L42 54 L8 60 L8 52 L42 40 Z" fill="#fff" transform="rotate(90 50 50)"/></svg></button></div>
+<button id="again" aria-label="again"><svg viewBox="0 0 64 64"><circle id="againRing" cx="32" cy="32" r="27" fill="none" stroke="#ff7aa8" stroke-width="6" stroke-dasharray="170" stroke-dashoffset="170" transform="rotate(-90 32 32)"/><path d="M32 16a16 16 0 1 0 15 11" fill="none" stroke="#555" stroke-width="6" stroke-linecap="round"/><path d="M40 12l9 4-5 9z" fill="#555"/></svg></button>
+<script type="module" src="main.js"></script>
+<script src="../../gf-playlog.js" defer></script>
+</body>
+</html>

@@ -973,7 +973,7 @@ async function scene3() {
     await wait(0.3);
     // ドールハウスのように前があく
     sfx.swoosh();
-    shot([0, 1.15, 0.9], 2.5, 1.85, [0, 0.2, 1], { phw: 2.0, speed: 1.0, depth: 1.5 });
+    shot([0, 1.1, 0.9], 2.5, 1.7, [0, 0.1, 1], { phw: 2.0, speed: 1.0, depth: 1.5 });
     await tween(1.2, k => rd.front.rotation.x = OPEN * k, ease.io);
     sfx.thud();
     const chair = rd.pieces.find(p => p.id === 'chair');
@@ -997,10 +997,10 @@ function lieOn(p, bed) {
   const c = bed.group.getWorldPosition(new V3());
   p.on = { what: 'bed', piece: bed };
   if (p instanceof Dog) {
-    p.st.pose = 'lie'; p.st.baseY = BASE + 0.42; p.g.position.set(c.x, BASE + 0.42, c.z + 0.35); p.g.rotation.y = 0.6;
+    p.st.pose = 'lie'; p.st.baseY = BASE + 0.42; p.g.position.set(c.x + 0.45, BASE + 0.42, c.z + 0.05); p.g.rotation.y = 0.4;
   } else {
-    p.g.rotation.y = 0; p.st.pose = 'lie'; p.st.baseY = BASE + 0.42 + p.torR * 0.75;
-    p.g.position.set(c.x, p.st.baseY, c.z - 0.62 + p.height * 0.93);
+    p.g.rotation.set(0, 0, p.g.rotation.z); p.st.pose = 'lie'; p.st.baseY = BASE + 0.45 + p.torR * 1.1;
+    p.g.position.set(c.x - 0.6 + p.height * 0.93, p.st.baseY, c.z);
     p.baseFace = 'sleep'; p.setFace('sleep');
   }
 }
@@ -1008,7 +1008,7 @@ function followFurniture() {
   people.forEach(p => {
     if (!p.on || p.dragging) return;
     if (p.on.what === 'chair') { const c = p.on.piece.group.getWorldPosition(tmp); p.g.position.x = c.x; p.g.position.z = c.z + 0.02; }
-    else { const c = p.on.piece.group.getWorldPosition(tmp); if (p instanceof Dog) { p.g.position.x = c.x; p.g.position.z = c.z + 0.35; } else { p.g.position.x = c.x; p.g.position.z = c.z - 0.62 + p.height * 0.93; } }
+    else { const c = p.on.piece.group.getWorldPosition(tmp); if (p instanceof Dog) { p.g.position.x = c.x + 0.45; p.g.position.z = c.z + 0.05; } else { p.g.position.x = c.x - 0.6 + p.height * 0.93; p.g.position.z = c.z; } }
   });
 }
 updaters.add(followFurniture);
@@ -1055,7 +1055,7 @@ function freePlay(rd) {
           const pos = p.g.position;
           const bc = bed.group.getWorldPosition(new V3()), cc = chair.group.getWorldPosition(new V3());
           const others = (what, piece) => people.some(o => o !== p && o.on && o.on.piece === piece && (what === 'chair' || !(o instanceof Dog) === !(p instanceof Dog)));
-          if (Math.abs(pos.x - bc.x) < 0.65 && Math.abs(pos.z - bc.z) < 1.0 && !others('bed', bed)) { lieOn(p, bed); sfx.drip(); }
+          if (Math.abs(pos.x - bc.x) < 1.0 && Math.abs(pos.z - bc.z) < 0.7 && !others('bed', bed)) { lieOn(p, bed); sfx.drip(); }
           else if (p !== dog && Math.hypot(pos.x - cc.x, pos.z - cc.z) < 0.45 && !others('chair', chair)) { seatOn(p, chair); p.setFace('laugh', 1); sfx.giggle(voiceOf); }
           else { p.st.baseY = BASE; p.g.rotation.y = 0; p.setFace('laugh', 1); if (voiceOf) sfx.giggle(voiceOf); else sfx.bark(); }
         },

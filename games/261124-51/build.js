@@ -277,7 +277,7 @@ export function makePieces(kit) {
   add('win1', windowPiece(kit, 0.9, 0.8), 'front', [(WIN_X[0] + WIN_X[1]) / 2, (WIN_Y[0] + WIN_Y[1]) / 2 - T / 2, 0]);
   add('win2', windowPiece(kit, 0.9, 0.8), 'house', [W / 2 - T / 2, (WIN_Y[0] + WIN_Y[1]) / 2, 0], Math.PI / 2);
   add('door', doorPiece(kit), 'front', [DOOR_X0 + 0.02, -T / 2 + 0.02, 0]);
-  add('bed', bedPiece(kit), 'house', [-1.0, 0, -0.42], 0, { furniture: true });
+  add('bed', bedPiece(kit), 'house', [-0.75, 0, -0.76], Math.PI / 2, { furniture: true });
   add('table', tablePiece(kit), 'house', [0.8, 0, -0.2], 0, { furniture: true });
   add('chair', chairPiece(kit), 'house', [0.8, 0, -0.85], 0, { furniture: true });
   return P;
@@ -464,7 +464,7 @@ export class Person {
     const legSit = -1.45 * Math.max(this.sitK, this.lieK * 0);
     this.legs[0].rotation.x = sw + legSit; this.legs[1].rotation.x = -sw + legSit;
     this.hips.position.y = this.legL - (this.legL - (s.seatH || 0.4)) * this.sitK;
-    this.g.rotation.x = -Math.PI / 2 * this.lieK;
+    this.g.rotation.z = Math.PI / 2 * this.lieK;
     for (let i = 0; i < 2; i++) {
       const a = this.arms[i];
       let tx = s.armX[i] - (i ? sw : -sw) * 0.8, tz = a.side * 0.12 + s.armZ[i] * a.side;

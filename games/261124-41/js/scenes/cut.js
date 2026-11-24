@@ -6,12 +6,22 @@ import { fx, hint } from '../fx.js';
 import { bubbles } from '../bubbles.js';
 import { snd } from '../snd.js';
 import { game, phase, wait, anim } from '../game.js';
+import { frame } from '../layout.js';
 
 export const BOARD = { x: 500, y: 590, w: 860 };
+// cut + stamp are authored in "board space" (a 860-wide board at 500,590);
+// boardFrame() maps that onto the real layout (board ≈ 960 units wide, filling the short side)
+export function boardFrame() {
+  const s = size('board');
+  const F = frame({ w: 960, h: 960 * s.h / s.w }, []);
+  return { F, k: (960 * F.k) / BOARD.w, ox: F.px, oy: F.py };
+}
+export const W = (T, x, y) => ({ x: T.ox + (x - BOARD.x) * T.k, y: T.oy + (y - BOARD.y) * T.k });
+export function applyT(ctx, T) { ctx.translate(T.ox, T.oy); ctx.scale(T.k, T.k); ctx.translate(-BOARD.x, -BOARD.y); }
 const VY = 650;          // vegetable axis on the board
 const HOVER = 120;       // knife height when waiting
-const PILES = [{ x: 290, y: 330 }, { x: 500, y: 330 }, { x: 710, y: 330 }];
-const PILE_OFF = [[-48, -14, 0.3], [40, -22, 1.4], [-6, 22, 2.2], [56, 28, 0.9], [-58, 40, 4.1]];
+const PILES = [{ x: 255, y: 345 }, { x: 500, y: 345 }, { x: 745, y: 345 }];
+const PILE_OFF = [[-62, -18, 0.3], [52, -28, 1.4], [-8, 28, 2.2], [72, 36, 0.9], [-74, 50, 4.1]];
 
 function vegDefs() {
   const body = geo('carrot', 'body', { x0: 0.05, x1: 0.7, cy: 0.59 });
@@ -28,9 +38,9 @@ function vegDefs() {
   const pw = 300, ph = pw * ps.h / ps.w;          // drawn rotated 90°: screen width = ph
   const ow = 330;
   return [
-    { name: 'carrot', x: cx, y: cy, w: cw, rot: 0, cuts: carrotCuts, leaf: true, piece: (i) => 'carrot_slice_' + (1 + (i % 3)), pieceW: 100, juice: 'rgba(255,140,40,0.9)', soft: false },
-    { name: 'potato', x: 500, y: VY, w: pw, rot: Math.PI / 2, cuts: [500 + ph * 0.24, 500, 500 - ph * 0.24], piece: (i) => 'potato_chunk_' + (1 + (i % 4)), pieceW: 92, juice: 'rgba(250,235,190,0.9)', soft: false },
-    { name: 'onion', x: 500, y: VY, w: ow, rot: 0, cuts: [500 + ow * 0.24, 500, 500 - ow * 0.24], piece: (i) => 'onion_wedge_' + (1 + (i % 4)), pieceW: 98, juice: 'rgba(240,245,255,0.9)', soft: true },
+    { name: 'carrot', x: cx, y: cy, w: cw, hw: cw * 0.45, rot: 0, cuts: carrotCuts, leaf: true, piece: (i) => 'carrot_slice_' + (1 + (i % 3)), pieceW: 128, juice: 'rgba(255,140,40,0.9)', soft: false },
+    { name: 'potato', x: 500, y: VY, w: pw, hw: ph * 0.45, rot: Math.PI / 2, cuts: [500 + ph * 0.24, 500, 500 - ph * 0.24], piece: (i) => 'potato_chunk_' + (1 + (i % 4)), pieceW: 120, juice: 'rgba(250,235,190,0.9)', soft: false },
+    { name: 'onion', x: 500, y: VY, w: ow, hw: ow * 0.45, rot: 0, cuts: [500 + ow * 0.24, 500, 500 - ow * 0.24], piece: (i) => 'onion_wedge_' + (1 + (i % 4)), pieceW: 124, juice: 'rgba(240,245,255,0.9)', soft: true },
   ];
 }
 
@@ -42,7 +52,7 @@ function makeSegs(v) {
   const segs = [];
   for (let i = 0; i < lines.length - 1; i++) {
     const l = lines[i], r = lines[i + 1];
-    const cx = clamp((Math.max(l.x, v.x - 600) + Math.min(r.x, v.x + 600)) / 2, 0, 1000);
+    const cx = clamp((Math.max(l.x, v.x - v.hw) + Math.min(r.x, v.x + v.hw)) / 2, 0, 1000);
     segs.push({ l, r, cx, dx: 0, dy: 0, rot: 0, alpha: 1, pop: 0, sq: new Spring(300, 14) });
   }
   return segs;
@@ -59,6 +69,8 @@ function segPath(ctx, s, ox = 0, oy = 0) {
 
 export default function cut() {
   let t = 0;
+  const T = boardFrame();
+  const fxp = (x, y) => W(T, x, y);
   const defs = vegDefs();
   const board = { sh: new Spring(400, 18) };
   const knife = { x: 1300, y: VY, h: HOVER, rot: Math.PI / 2, vis: 1 };
@@ -94,7 +106,7 @@ export default function cut() {
     game.block = false;
     accepting = true;
     phase('cut-' + d.name);
-    hint.set({ type: 'tap', x: () => veg.cuts[Math.min(cutN, veg.cuts.length - 1)], y: VY, r: 110 });
+    hint.set({ type: 'tap', x: () => fxp(veg.cuts[Math.min(cutN, veg.cuts.length - 1)], VY).x, y: fxp(0, VY).y, r: 110 * T.k });
   }
 
   async function chop() {
@@ -121,7 +133,7 @@ export default function cut() {
     hint.progress();
     snd.sfx('chop', { soft: veg.soft, pitch: 1 + rnd.range(-0.05, 0.05) });
     board.sh.kick(-60);
-    fx.specks(veg.cuts[i], VY + rnd.range(-30, 30), 7, veg.juice, 240, 5);
+    { const q = fxp(veg.cuts[i], VY + rnd.range(-30, 30)); fx.specks(q.x, q.y, 7, veg.juice, 240 * T.k, 5 * T.k); }
     // every strip right of this cut moves a little further right
     const cx = veg.cuts[i];
     for (const s of segs) {
@@ -157,7 +169,7 @@ export default function cut() {
     snd.sfx('pop');
     await anim(0.25, (k) => { for (const s of live) { s.pop = Math.sin(k * Math.PI) * 0.12; s.alpha = 1 - k; } for (const p of made) p.a = k; });
     veg = null;
-    fx.sparkle(500, VY, 10, 200);
+    { const q = fxp(500, VY); fx.sparkle(q.x, q.y, 10, 200 * T.k); }
     await wait(0.15);
     snd.sfx('slide');
     made.forEach((p, k) => {
@@ -169,14 +181,14 @@ export default function cut() {
     await wait(0.8);
     snd.sfx('ding');
     bubbles.girl.setFace('girl_happy'); bubbles.girl.jump(0.7);
-    fx.sparkle(pile.x, pile.y, 10, 90);
+    { const q = fxp(pile.x, pile.y); fx.sparkle(q.x, q.y, 10, 90 * T.k); }
     await wait(0.8);
     if (vi + 1 < defs.length) { bubbles.girl.setFace('girl_focus'); bring(vi + 1); }
     else {
       phase('done');
       snd.sfx('success');
       bubbles.mama.setFace('mama_wow'); bubbles.mama.jump(0.8);
-      fx.sparkle(500, 330, 18, 300);
+      { const q = fxp(500, 345); fx.sparkle(q.x, q.y, 18, 300 * T.k); }
       await wait(1.6);
       game.goto('stamp');
     }
@@ -209,6 +221,7 @@ export default function cut() {
 
   return {
     enter() {
+      bubbles.setHomes(T.F.bub);
       bubbles.mama.show('mama_smile'); bubbles.girl.show('girl_focus');
       bring(0);
     },
@@ -222,6 +235,7 @@ export default function cut() {
       backdrop(ctx, 'bg_counter', 500, 500, 1600);
       const by = board.sh.x * 0.05;
       ctx.save();
+      applyT(ctx, T);
       ctx.translate(0, by);
       spr(ctx, 'board', BOARD.x, BOARD.y, BOARD.w);
       for (const p of pieces) {
@@ -234,7 +248,10 @@ export default function cut() {
     drawTop(ctx) {
       // knife (with its lifted shadow), bobbing gently while it waits
       const bob = accepting && !chopping ? Math.sin(t * 3) * 6 : 0;
+      ctx.save();
+      applyT(ctx, T);
       spr(ctx, 'knife', knife.x, knife.y, 620, { rot: knife.rot, h: knife.h + bob, sa: 0.9 });
+      ctx.restore();
     },
     down() {
       if (!accepting || !veg) return;

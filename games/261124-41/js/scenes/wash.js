@@ -7,12 +7,27 @@ import { bubbles } from '../bubbles.js';
 import { snd } from '../snd.js';
 import { game, phase, wait, anim } from '../game.js';
 
-const BOWL = { x: 500, y: 560, w: 720 };
-const BRUSH = 55;
-const ITEMS = [
-  { name: 'carrot', w: 560, rot: -0.12, cleanX: 410, cleanY: 95, cleanW: 330, cleanRot: 0.04 },
-  { name: 'potato', w: 230, rot: 0.35, cleanX: 690, cleanY: 100, cleanW: 120, cleanRot: 1.3 },
-];
+import { frame } from '../layout.js';
+
+const BOWL_W = 860;
+let BOWL = { x: 500, y: 560, w: BOWL_W };
+let BRUSH = 60;
+let ITEMS = [];
+
+// bowl fills the short side; washed vegetables go to slots in the free band
+function plan() {
+  const s0 = size('bowl_water');
+  const F = frame({ w: BOWL_W, h: BOWL_W * s0.h / s0.w }, ['carrot', 'potato'], { sec: 250, minSec: 215 });
+  BOWL = { x: F.px, y: F.py, w: BOWL_W * F.k };
+  const K = BOWL.w / 720;
+  BRUSH = 58 * K;
+  const side = F.mode === 'side', c = F.slots.carrot, p = F.slots.potato;
+  ITEMS = [
+    { name: 'carrot', w: 560 * K, rot: -0.12, cleanX: c.x, cleanY: c.y, cleanW: c.s * (side ? 1.25 : 1.7), cleanRot: side ? -1.25 : 0.04 },
+    { name: 'potato', w: 230 * K, rot: 0.35, cleanX: p.x, cleanY: p.y, cleanW: p.s * 0.6, cleanRot: 1.3 },
+  ];
+  return F;
+}
 
 function makeDirt(name) {
   const s = size(name);
@@ -28,6 +43,8 @@ function makeDirt(name) {
     x.fillStyle = `rgba(${rnd.pick(browns)},${rnd.range(0.6, 1)})`;
     x.beginPath(); x.arc(rnd() * cw, rnd() * ch, rnd.range(1, 3), 0, TAU); x.fill();
   }
+  // the carrot's leaves stay clean: only the root counts as dirt to rub off
+  if (name === 'carrot') x.clearRect(geo('carrot', 'body', { x1: 0.7 }).x1 * cw + 6, 0, cw, ch);
   x.globalCompositeOperation = 'destination-in';
   x.drawImage(img(name), 0, 0, cw, ch);
   return c;
@@ -63,11 +80,12 @@ export default function wash() {
   async function bring(i) {
     const it = ITEMS[i];
     const c = inner();
-    cur = { ...it, x: -300, y: c.y + 30, h: 160, bobT: rnd() * 5, sq: new Spring(200, 8), dirt: makeDirt(it.name), dirtA: 1, clean: false, glint: -1 };
+    cur = { ...it, x: c.x - c.r * 2.2, y: c.y + 30, h: 160, bobT: rnd() * 5, sq: new Spring(200, 8), dirt: makeDirt(it.name), dirtA: 1, clean: false, glint: -1 };
     cur.total = measure();
     phase(i === 0 ? 'wash-carrot-enter' : 'wash-potato-enter');
     game.block = true;
-    await anim(0.8, (k) => { cur.x = lerp(-300, c.x, k); cur.h = 160 * (1 - k) + Math.sin(k * Math.PI) * 60; }, ease.outCubic);
+    const x0 = cur.x;
+    await anim(0.8, (k) => { cur.x = lerp(x0, c.x, k); cur.h = 160 * (1 - k) + Math.sin(k * Math.PI) * 60; }, ease.outCubic);
     cur.h = 0;
     snd.sfx('splash');
     cur.sq.kick(4);
@@ -75,7 +93,7 @@ export default function wash() {
     fx.drops(cur.x, cur.y, 14, 'rgba(215,235,250,0.9)', 320);
     game.block = false;
     phase(i === 0 ? 'wash-carrot' : 'wash-potato');
-    hint.set({ type: 'rub', x: () => cur.x, y: () => cur.y, r: Math.min(it.w * 0.5, 200) });
+    hint.set({ type: 'rub', x: () => cur.x - (it.name === 'carrot' ? it.w * 0.06 : 0), y: () => cur.y, r: it.name === 'carrot' ? it.w * 0.32 : it.w * 0.62 });
   }
 
   function addRipple(x, y, big = 1) { water.ripples.push({ x, y, age: 0, big }); if (water.ripples.length > 18) water.ripples.shift(); }
@@ -119,7 +137,7 @@ export default function wash() {
     snd.sfx('shine');
     fx.sparkle(v.x, v.y, 16, v.w * 0.5);
     bubbles.girl.setFace('girl_happy'); bubbles.girl.jump(0.6);
-    anim(0.7, (k) => { v.glint = k; }, ease.inOutQuad, 0.15);
+    anim(0.5, (k) => { v.glint = k; }, ease.inOutQuad, 0.1);
     await wait(0.9);
     snd.sfx('pop');
     const x0 = v.x, y0 = v.y, w0 = v.w, r0 = v.rot;
@@ -141,7 +159,7 @@ export default function wash() {
       snd.sfx('success');
       bubbles.girl.setFace('girl_happy'); bubbles.girl.jump(1);
       bubbles.mama.setFace('mama_smile'); bubbles.mama.jump(0.7);
-      fx.sparkle(500, 120, 14, 200);
+      fx.sparkle(BOWL.x, BOWL.y, 14, BOWL.w * 0.35);
       await wait(1.4);
       game.goto('cut');
     }
@@ -168,8 +186,9 @@ export default function wash() {
       gx.drawImage(img(v.name), 0, 0, gc.width, gc.height);
       gx.globalCompositeOperation = 'source-in';
       const p = (v.glint * 1.6 - 0.3) * gc.width;
-      const g = gx.createLinearGradient(p - 80, 0, p + 80, gc.height * 0.4);
-      g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.85)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      // brief, narrow glint: the vegetable must keep its own vivid colour
+      const g = gx.createLinearGradient(p - 26, 0, p + 26, gc.height * 0.25);
+      g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(255,255,255,0)');
       gx.fillStyle = g; gx.fillRect(0, 0, gc.width, gc.height);
       ctx.globalCompositeOperation = 'lighter';
       ctx.drawImage(gc, -v.w / 2, -hh / 2, v.w, hh);
@@ -179,6 +198,7 @@ export default function wash() {
 
   return {
     enter() {
+      bubbles.setHomes(plan().bub);
       bubbles.mama.show('mama_smile'); bubbles.girl.show('girl_focus');
       bring(0);
     },

@@ -112,8 +112,18 @@ export const fx = {
       spawn({ type: 'petal', x: rnd.range(L.ex0, L.ex1), y: L.ey0 - rnd.range(20, 500), vx: rnd.range(-50, 50), vy: rnd.range(90, 170), life: 7, size: rnd.range(12, 20), color: rnd.pick(['#ffc1d6', '#ffd6e4', '#ffb0c8']), rot: rnd() * TAU, vr: rnd.range(-3, 3), wob: rnd() * TAU }, 'over');
     }
   },
-  sweat(x, y, layer = 'over') {
-    spawn({ type: 'sweat', x, y, vx: 0, vy: 26, life: 1.4, size: 20 }, layer);
+  heartAt(x, y, vx, vy, size, delay = 0) {
+    spawn({ type: 'heart', x, y, vx, vy, drag: 0.6, life: 1.5, size, color: rnd.pick(['#ff5c8a', '#ff7aa2', '#ff4d6d']), wob: rnd() * TAU, delay }, 'over');
+  },
+  // sparkles born on a ring of radius r, flying outward
+  sparkleRing(x, y, r, n = 10, color) {
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * TAU, s = rnd.range(80, 220);
+      spawn({ type: 'spark', x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: Math.cos(a) * s, vy: Math.sin(a) * s, drag: 0.05, life: rnd.range(0.5, 0.9), size: rnd.range(12, 24), color: color || rnd.pick(['#fff7c8', '#ffffff', '#ffe08a']), vr: rnd.range(-3, 3) }, 'over');
+    }
+  },
+  sweat(x, y, layer = 'over', size = 20) {
+    spawn({ type: 'sweat', x, y, vx: 0, vy: size * 1.3, life: 1.4, size }, layer);
   },
   burst(x, y, r = 120, color = '#fff3b0', layer = 'over') {
     spawn({ type: 'burst', x, y, life: 0.6, size: r, color }, layer);
@@ -297,7 +307,8 @@ function drawList(ctx, list) {
         ctx.translate(p.x, p.y); ctx.rotate(k * 0.6);
         const n = 12;
         for (let i = 0; i < n; i++) {
-          const a = (i / n) * TAU, r0 = p.size * (0.3 + k * 0.6), r1 = p.size * (0.6 + k * 0.9);
+          // rays start outside the given radius (never over a face)
+          const a = (i / n) * TAU, r0 = p.size * (1.04 + k * 0.3), r1 = p.size * (1.4 + k * 0.7);
           ctx.beginPath();
           ctx.moveTo(Math.cos(a - 0.08) * r0, Math.sin(a - 0.08) * r0);
           ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1);

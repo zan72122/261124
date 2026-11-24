@@ -6,9 +6,21 @@ import { bubbles } from '../bubbles.js';
 import { snd } from '../snd.js';
 import { game, phase, wait, anim } from '../game.js';
 import { createPlate, drawPlate } from '../plate.js';
+import { frame } from '../layout.js';
+import { L } from '../engine.js';
 
-export const PLATE_SERVE = { x: 500, y: 500, w: 640 };
-export const SPOON_REST = { x: 905, y: 540, rot: 0.12, w: 78 };
+// plate (≈780) fills the short side; paddle, decor spoon and ladle sit in the free band
+export function serveLayout() {
+  const F = frame({ w: 780, h: 780 }, ['shamoji', 'spoon', 'ladle'], { sec: 260, minSec: 235, left: ['shamoji'], right: ['ladle', 'spoon'] });
+  const sl = F.slots;
+  return {
+    F,
+    plate: { x: F.px, y: F.py, w: 780 * F.k },
+    spoon: { x: sl.spoon.x, y: sl.spoon.y, rot: 0.12, w: sl.spoon.s * 0.27 },
+    shamoji: { x: sl.shamoji.x, y: sl.shamoji.y, rot: -0.35, w: sl.shamoji.s * 0.5 },
+    ladle: { x: sl.ladle.x, y: sl.ladle.y, rot: 0, w: sl.ladle.s * 1.1 },
+  };
+}
 export const SHAPES = [
   // placed exactly on the bite spots that will eat them (see eat.js BITES)
   { name: 'carrot_flower', ax: 0.6, ay: 0.32, rot: 0.3 },
@@ -26,18 +38,20 @@ export function drawSpoon(ctx, x, y, rot, w, o = {}) {
 
 export default function serve() {
   let steamT = 0, steaming = false;
-  const plate = createPlate(PLATE_SERVE.x, PLATE_SERVE.y, PLATE_SERVE.w);
+  const SL = serveLayout();
+  const plate = createPlate(SL.plate.x, SL.plate.y, SL.plate.w);
+  const kf = SL.plate.w / 640;
   const psq = new Spring(260, 10);
   const tools = {
-    shamoji: { name: 'shamoji_rice', rx: 165, ry: 820, rrot: -0.55, w: 150, x: 165, y: 820, rot: -0.55, h: 0, a: 1, used: false },
-    ladle: { name: 'ladle_curry', rx: 830, ry: 840, rrot: 0, w: 300, x: 830, y: 840, rot: 0, h: 0, a: 1, used: false },
+    shamoji: Object.assign({ name: 'shamoji_rice', h: 0, a: 1, used: false }, SL.shamoji),
+    ladle: Object.assign({ name: 'ladle_curry', h: 0, a: 1, used: false }, SL.ladle),
   };
   let step = 'rice', held = null;
 
   function setHint() {
     const tl = step === 'rice' ? tools.shamoji : tools.ladle;
     const tp = plate.pt(step === 'rice' ? 'rice' : 'curry');
-    hint.set({ type: 'drag', x: tl.x, y: tl.y, x2: tp.x, y2: tp.y, r: 110 });
+    hint.set({ type: 'drag', x: tl.x, y: tl.y, x2: tp.x, y2: tp.y, r: 120 * kf });
   }
 
   async function use(tl, kind) {
@@ -47,7 +61,7 @@ export default function serve() {
     game.block = true;
     const tp = plate.pt(kind);
     const x0 = tl.x, y0 = tl.y, r0 = tl.rot, h0 = tl.h;
-    const over = kind === 'rice' ? { x: tp.x + 10, y: tp.y + 40, rot: -0.3 } : { x: tp.x + 70, y: tp.y + 40, rot: -0.5 };
+    const over = kind === 'rice' ? { x: tp.x + 10 * kf, y: tp.y + 40 * kf, rot: -0.3 } : { x: tp.x + 70 * kf, y: tp.y + 40 * kf, rot: -0.5 };
     await anim(0.45, (k) => { tl.x = lerp(x0, over.x, k); tl.y = lerp(y0, over.y, k); tl.rot = lerp(r0, over.rot, k); tl.h = lerp(h0, 110, k) + Math.sin(k * Math.PI) * 80; }, ease.inOutCubic);
     if (kind === 'rice') {
       phase('rice');
@@ -57,7 +71,7 @@ export default function serve() {
       await anim(0.35, (k) => { plate.reveal.k = k; }, ease.outCubic);
       plate.state = 'rice'; plate.reveal = null;
       psq.kick(4);
-      fx.sparkle(tp.x, tp.y, 8, 100);
+      fx.sparkle(tp.x, tp.y, 8, 120 * kf);
     } else {
       phase('curry');
       snd.sfx('pour');
@@ -70,7 +84,7 @@ export default function serve() {
     }
     // tool flies away
     const x1 = tl.x, y1 = tl.y, h1 = tl.h, rr = tl.rot;
-    const away = kind === 'rice' ? { x: -250, y: 1150 } : { x: 1250, y: 1150 };
+    const away = kind === 'rice' ? { x: L.ex0 - 300, y: L.ey1 + 200 } : { x: L.ex1 + 300, y: L.ey1 + 200 };
     anim(0.5, (k) => { tl.x = lerp(x1, away.x, k); tl.y = lerp(y1, away.y, k); tl.h = h1 + k * 100; tl.rot = rr + k * 0.4; tl.a = 1 - k; }, ease.inCubic);
     await wait(0.4);
     if (kind === 'rice') {
@@ -84,7 +98,7 @@ export default function serve() {
   async function shapesDrop() {
     phase('toppings');
     for (const s of SHAPES) {
-      const sh = { name: s.name, nx: s.ax, ny: s.ay, w: 64, rot: s.rot, h: 300, a: 1 };
+      const sh = { name: s.name, nx: s.ax, ny: s.ay, w: 80 * kf, rot: s.rot, h: 300, a: 1 };
       plate.shapes.push(sh);
       await anim(0.3, (k) => { sh.h = 300 * (1 - k); }, ease.inQuad);
       sh.h = 0;
@@ -105,11 +119,12 @@ export default function serve() {
     await wait(0.35);
     await anim(0.35, (k) => { bubbles.mama.bow = 1 - k; bubbles.girl.bow = 1 - k; }, ease.inOutQuad);
     await wait(0.3);
-    game.goto('eat', { fade: false, carry: { plate } });
+    game.goto('eat', { fade: false, carry: { plate, spoon: SL.spoon } });
   }
 
   return {
     enter() {
+      bubbles.setHomes(SL.F.bub);
       bubbles.mama.show('mama_smile'); bubbles.girl.show('girl_smile');
       phase('serve-rice');
       setHint();
@@ -124,14 +139,14 @@ export default function serve() {
     draw(ctx) {
       drawTable(ctx);
       drawPlate(ctx, plate);
-      drawSpoon(ctx, SPOON_REST.x, SPOON_REST.y, SPOON_REST.rot, SPOON_REST.w);
+      drawSpoon(ctx, SL.spoon.x, SL.spoon.y, SL.spoon.rot, SL.spoon.w);
       for (const k in tools) { const tl = tools[k]; if (tl.h < 40 && tl.a > 0) drawTool(ctx, tl); }
     },
     drawTop(ctx) { for (const k in tools) { const tl = tools[k]; if (tl.h >= 40 && tl.a > 0) drawTool(ctx, tl); } },
     down(p) {
       const tl = step === 'rice' ? tools.shamoji : step === 'curry' ? tools.ladle : null;
       if (!tl || tl.used) return;
-      held = { tl, ox: tl.x - p.x, oy: tl.y - p.y, moved: 0, near: dist(p.x, p.y, tl.x, tl.y) < Math.max(160, minHit()) };
+      held = { tl, ox: tl.x - p.x, oy: tl.y - p.y, moved: 0, near: dist(p.x, p.y, tl.x, tl.y) < Math.max(tl.w * 0.9, 180, minHit()) };
       if (held.near) tl.h = 40;
     },
     move(p) {

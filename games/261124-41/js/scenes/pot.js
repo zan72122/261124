@@ -6,16 +6,19 @@ import { fx, hint } from '../fx.js';
 import { bubbles } from '../bubbles.js';
 import { snd } from '../snd.js';
 import { game, phase, wait, anim } from '../game.js';
-import { POT, createPot, potSpots, drawStove, drawPot } from '../potview.js';
+import { L as LAY } from '../engine.js';
+import { POT, planPot, createPot, potSpots, drawStove, drawPot } from '../potview.js';
 
-const DISH_W = 200;
-const DISHES = [
-  { x: 168, y: 815, kind: 'meat' }, { x: 390, y: 875, kind: 'onion' },
-  { x: 612, y: 875, kind: 'potato' }, { x: 834, y: 815, kind: 'carrot' },
-];
-const JUG = { x: 820, y: 800, w: 300 };
+let DISH_W = 220;
+let JUG = { x: 820, y: 800, w: 300 };
+const KINDS = ['meat', 'onion', 'potato', 'carrot'];
 
+// pieces lying on a dish: sizes/offsets authored for a 200-unit dish and a 280-radius pot
 function dishPieces(kind) {
+  const fd = DISH_W / 200, fp = POT.outerR / 280;
+  return dishPieces0(kind).map((p) => Object.assign(p, { w: p.w * fd, potW: p.potW * fp, ox: p.ox * fd, oy: p.oy * fd }));
+}
+function dishPieces0(kind) {
   const ring = (n, r) => Array.from({ length: n }, (_, i) => { const a = i / n * TAU + rnd.range(-0.2, 0.2); return [Math.cos(a) * r, Math.sin(a) * r]; });
   const make = (names, w, potW, pos, extra = {}) => names.map((name, i) => Object.assign({ name, w, potW, ox: pos[i][0], oy: pos[i][1], rot: rnd() * TAU }, typeof extra === 'function' ? extra(i) : extra));
   if (kind === 'meat') return make([1, 2, 3, 1, 2].map((i) => 'meat_raw_' + i), 58, 76, [[0, 0], ...ring(4, 42)], (i) => ({ cooked: 'meat_cooked_' + [1, 2, 3, 1, 2][i] }));
@@ -30,15 +33,19 @@ function dishPieces(kind) {
 
 export default function pot() {
   let t = 0;
+  const F = planPot();
+  DISH_W = F.slots.meat.s;
+  JUG = F.jug;
   const pv = createPot();
   const spots = potSpots(pv, 24);
-  const dishes = DISHES.map((d) => ({ ...d, sx: d.x, sy: d.y, h: 0, rot: rnd.range(-0.2, 0.2), alpha: 1, pieces: dishPieces(d.kind), used: false, held: false, sq: new Spring(260, 10) }));
+  const dishes = KINDS.map((kind) => ({ kind, x: F.slots[kind].x, y: F.slots[kind].y, sx: F.slots[kind].x, sy: F.slots[kind].y, h: 0, rot: rnd.range(-0.2, 0.2), alpha: 1, pieces: dishPieces(kind), used: false, held: false, sq: new Spring(260, 10) }));
   const flying = [];
   let step = 'flame';
   let dishesDone = 0;
   let held = null;
   const loops = {};
-  const jug = { x: 1300, y: JUG.y, rot: -0.15, h: 0, vis: false, tilt: 0 };
+  const jugOff = LAY.ex1 + JUG.w;
+  const jug = { x: jugOff, y: JUG.y, rot: -0.15, h: 0, vis: false, tilt: 0 };
   let pouring = false, holding = false, pourMin = 0, firstContact = false, pourT = 0;
   let simmerTimer = 0, rattleT = 0, steamT = 0, sizzleSpeckT = 0, whiteout = 0;
 
@@ -120,7 +127,7 @@ export default function pot() {
     // water jug slides in
     jug.vis = true;
     snd.sfx('slide');
-    await anim(0.6, (k) => { jug.x = lerp(1300, JUG.x, k); }, ease.outCubic);
+    await anim(0.6, (k) => { jug.x = lerp(jugOff, JUG.x, k); }, ease.outCubic);
     game.block = false;
     step = 'water';
     phase('water');
@@ -169,14 +176,15 @@ export default function pot() {
     snd.sfx('ding');
     bubbles.girl.setFace('girl_happy');
     const x0 = jug.x, y0 = jug.y;
-    anim(0.6, (k) => { jug.x = lerp(x0, 1350, k); jug.y = lerp(y0, y0 - 100, k); jug.h = 70 + k * 80; }, ease.inCubic).then(() => { jug.vis = false; });
+    anim(0.6, (k) => { jug.x = lerp(x0, jugOff + 100, k); jug.y = lerp(y0, y0 - 100, k); jug.h = 70 + k * 80; }, ease.inCubic).then(() => { jug.vis = false; });
     await wait(0.7);
     // lid flies in and lands
     phase('lid');
     const g = pv.g;
-    pv.lid = { x: 1200, y: -300, h: 400, alpha: 1, rot: 0.6, sq: new Spring(260, 10) };
+    const lx0 = LAY.ex1 + 300, ly0 = LAY.ey0 - 300;
+    pv.lid = { x: lx0, y: ly0, h: 400, alpha: 1, rot: 0.6, sq: new Spring(260, 10) };
     snd.sfx('whoosh');
-    await anim(0.7, (k) => { pv.lid.x = lerp(1200, g.ix, k); pv.lid.y = lerp(-300, g.iy, k); pv.lid.h = 400 * (1 - k) + Math.sin(k * Math.PI) * 80; pv.lid.rot = 0.6 * (1 - k); }, ease.inOutCubic);
+    await anim(0.7, (k) => { pv.lid.x = lerp(lx0, g.ix, k); pv.lid.y = lerp(ly0, g.iy, k); pv.lid.h = 400 * (1 - k) + Math.sin(k * Math.PI) * 80; pv.lid.rot = 0.6 * (1 - k); }, ease.inOutCubic);
     pv.lid.h = 0;
     snd.sfx('clink');
     pv.lid.sq.kick(5);
@@ -225,12 +233,13 @@ export default function pot() {
 
   return {
     enter() {
+      bubbles.setHomes(F.bub);
       bubbles.mama.show('mama_smile'); bubbles.girl.show('girl_focus');
       ignite();
     },
-    exit() {
+    exit(next) {
       // flame + simmer loops continue in roux when we hand over the pot
-      for (const k in loops) if (k !== 'flame' && k !== 'simmer') loops[k].stop(0.3);
+      for (const k in loops) if (next !== 'roux' || (k !== 'flame' && k !== 'simmer')) loops[k].stop(0.3);
       pv.loops = loops;
     },
     update(dt) {
@@ -260,7 +269,7 @@ export default function pot() {
               snd.sfx('steam');
               for (let i = 0; i < 12; i++) fx.steam(g.ix + rnd.range(-120, 120), g.iy + rnd.range(-120, 120), { size: 110, alpha: 0.7, life: 2, spread: 40 });
             }
-            const lp = { x: g.ix + g.ir * 0.12, y: g.iy + g.ir * 0.05 };
+            const lp = { x: g.ix + g.ir * 0.04, y: g.iy + g.ir * 0.04 };
             if (rnd() < dt * 10) pv.ripple(lp.x + rnd.range(-10, 10), lp.y + rnd.range(-10, 10), 0.8, 0.9);
             if (rnd() < dt * 12) fx.drops(lp.x, lp.y, 2, 'rgba(225,240,250,0.9)', 160);
             L('sizzle').set(Math.max(0, 1 - pv.water * 1.4), 0.2);
@@ -354,7 +363,7 @@ export default function pot() {
 
   function drawStream(ctx) {
     const s = spout(), g = pv.g;
-    const lx = g.ix + g.ir * 0.12, ly = g.iy + g.ir * 0.05;
+    const lx = g.ix + g.ir * 0.04, ly = g.iy + g.ir * 0.04;
     const mx = (s.x + lx) / 2 + 20, my = (s.y + ly) / 2 - 10;
     ctx.save();
     ctx.lineCap = 'round';

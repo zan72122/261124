@@ -7,11 +7,31 @@ import { bubbles } from '../bubbles.js';
 import { snd } from '../snd.js';
 import { game, phase, wait, anim } from '../game.js';
 import { createPlate, drawPlate, startEating, bite, wipe } from '../plate.js';
-import { PLATE_SERVE, SPOON_REST, SHAPES, drawTable } from './serve.js';
+import { serveLayout, SHAPES, drawTable } from './serve.js';
+import { safe, M } from '../layout.js';
 
-export const PLATE_EAT = { x: 500, y: 640, w: 600 };
-export const SPOON_EAT = { x: 895, y: 680, rot: 0.12, w: 78 };
-export const SEATS = { mama: { x: 150, y: 150, d: 270 }, girl: { x: 850, y: 150, d: 270 } };
+// big bubbles (≈360) at the table: above the plate side by side in portrait, left/right of it in landscape
+export function eatLayout() {
+  const E = safe();
+  const out = {};
+  if (E.h >= E.w) {
+    const d = Math.min(360, (E.w - 3 * M) / 2);
+    const pw = Math.min(780, E.w - 2 * M - 150, E.h - d - 3 * M);
+    const group = d + M + pw;
+    const y0 = E.y0 + Math.max(M, (E.h - group) / 2);
+    out.seats = { mama: { x: E.cx - d / 2 - M / 2, y: y0 + d / 2, d }, girl: { x: E.cx + d / 2 + M / 2, y: y0 + d / 2, d } };
+    out.plate = { x: E.cx, y: y0 + d + M + pw / 2, w: pw };
+    out.spoon = { x: Math.min(E.x1 - M - 40, E.cx + pw / 2 + 75), y: out.plate.y + pw * 0.12, rot: 0.12, w: 66 * pw / 600 };
+  } else {
+    const pw = Math.max(560, Math.min(780, E.h - 2 * M, E.w - 2 * (360 + 2 * M)));
+    const band = (E.w - pw) / 2;
+    const d = Math.min(360, band - 2 * M);
+    out.plate = { x: E.cx, y: E.cy, w: pw };
+    out.seats = { mama: { x: E.x0 + band / 2, y: E.cy - pw * 0.12, d }, girl: { x: E.x1 - band / 2, y: E.cy - pw * 0.12, d } };
+    out.spoon = { x: E.x1 - band / 2, y: Math.min(E.y1 - 150, out.seats.girl.y + d / 2 + M + 130), rot: 0.12, w: Math.min(78, band * 0.25) * pw / 600 * 1.2 };
+  }
+  return out;
+}
 
 // bite spots (normalised plate coords); the topping eaten with that bite
 const BITES = [
@@ -25,15 +45,19 @@ const BITES = [
 
 export function setupPlate(carry) {
   if (carry && carry.plate) return carry.plate;
-  const p = createPlate(PLATE_EAT.x, PLATE_EAT.y, PLATE_EAT.w);
+  const SL = serveLayout();
+  const p = createPlate(SL.plate.x, SL.plate.y, SL.plate.w);
   p.state = 'full';
-  for (const s of SHAPES) p.shapes.push({ name: s.name, nx: s.ax, ny: s.ay, w: 64, rot: s.rot, h: 0, a: 1 });
+  for (const s of SHAPES) p.shapes.push({ name: s.name, nx: s.ax, ny: s.ay, w: 80 * SL.plate.w / 640, rot: s.rot, h: 0, a: 1 });
   return p;
 }
 
 export default function eat(carry) {
   let steamT = 0;
   const plate = setupPlate(carry);
+  const EL = eatLayout();
+  const SPOON_REST = (carry && carry.spoon) || serveLayout().spoon;
+  const SPOON_EAT = EL.spoon, SEATS = EL.seats;
   const spoon = { x: 0, y: 0, rot: SPOON_REST.rot, w: SPOON_REST.w, h: 0, a: 1, heap: null, top: null, sc: 1, flying: false };
   let n = 0, busy = true;
   const psq = new Spring(260, 10);
@@ -59,10 +83,10 @@ export default function eat(carry) {
     const m = bubbles.mama, g = bubbles.girl;
     m.place(SEATS.mama, 0.9); g.place(SEATS.girl, 0.9);
     const x0 = plate.x, y0 = plate.y, w0 = plate.w;
-    const s0 = { x: spoon.x, y: spoon.y }, s1 = restHead(SPOON_EAT);
+    const s0 = { x: spoon.x, y: spoon.y, w: spoon.w }, s1 = restHead(SPOON_EAT);
     await anim(0.9, (k) => {
-      plate.x = lerp(x0, PLATE_EAT.x, k); plate.y = lerp(y0, PLATE_EAT.y, k); plate.w = lerp(w0, PLATE_EAT.w, k);
-      spoon.x = lerp(s0.x, s1.x, k); spoon.y = lerp(s0.y, s1.y, k);
+      plate.x = lerp(x0, EL.plate.x, k); plate.y = lerp(y0, EL.plate.y, k); plate.w = lerp(w0, EL.plate.w, k);
+      spoon.x = lerp(s0.x, s1.x, k); spoon.y = lerp(s0.y, s1.y, k); spoon.w = lerp(s0.w, SPOON_EAT.w, k);
     }, ease.inOutCubic);
     startEating(plate);
     turn();
@@ -105,13 +129,13 @@ export default function eat(carry) {
     if (b.top) { const s = plate.shapes.find((q) => q.name === b.top); if (s) s.a = 0; }
     psq.kick(2);
     spoon.heap = b.food; spoon.top = b.top || null;
-    fx.specks(tx, ty, 4, 'rgba(160,90,30,0.7)', 120, 4);
+    fx.specks(tx, ty, 4, 'rgba(160,90,30,0.7)', 150, 5);
     // up to the eater
     const x1 = spoon.x, y1 = spoon.y, r1 = spoon.rot;
     const toRot = b.who === 'mama' ? -0.9 : 0.6;
     await anim(0.55, (k) => {
       const q = who.pos();
-      spoon.x = lerp(x1, q.x + (b.who === 'mama' ? 40 : -40), k); spoon.y = lerp(y1, q.y + q.d * 0.35, k);
+      spoon.x = lerp(x1, q.x + q.d * (b.who === 'mama' ? 0.1 : -0.1), k); spoon.y = lerp(y1, q.y + q.d * 0.33, k);
       spoon.rot = lerp(r1, toRot, k); spoon.h = Math.sin(k * Math.PI) * 200 + k * 60;
     }, ease.inOutCubic);
     // into the mouth
@@ -122,7 +146,6 @@ export default function eat(carry) {
     who.setFace(b.who === 'mama' ? 'mama_smile' : 'girl_happy', false);
     who.talk(0.5);
     await wait(0.55);
-    const q = who.pos();
     if (b.who === 'mama' && n === 0) {
       // the peak: tired Mama is full of energy again
       phase('mama-first-bite');
@@ -130,23 +153,26 @@ export default function eat(carry) {
       who.jump(1.6);
       snd.sfx('sparkle');
       snd.sfx('mama', { mood: 'wow' });
-      fx.burst(q.x, q.y, q.d * 0.75, '#fff0a0');
-      fx.sparkle(q.x, q.y, 22, q.d * 0.6, 'over');
+      // she grows ~25 % for this beat; rays, sparkles and hearts stay outside her face
+      anim(0.35, (k) => { who.boost = 0.25 * k; }, ease.outBack);
       anim(0.4, (k) => { who.glow = k; });
-      for (let i = 0; i < 3; i++) game.clock.after(0.15 + i * 0.22, () => { const r = who.pos(); fx.hearts(r.x + (i - 1) * 50, r.y + r.d * 0.2, 1, 'over', 1.6); snd.sfx('heart', { pitch: 1 + i * 0.1 }); });
-      await wait(0.9);
+      game.clock.after(0.15, () => { bubbles.rays('mama'); bubbles.sparkle('mama', 22); });
+      for (let i = 0; i < 3; i++) game.clock.after(0.3 + i * 0.25, () => { bubbles.hearts('mama', 1, 1.5); snd.sfx('heart', { pitch: 1 + i * 0.1 }); });
+      await wait(1.4);
       snd.sfx('yum');
       who.setFace('mama_laugh');
       who.jump(0.8);
-      await wait(0.8);
+      await wait(0.6);
+      anim(0.6, (k) => { who.boost = 0.25 * (1 - k); }, ease.inOutQuad);
+      await wait(0.4);
       anim(1.2, (k) => { who.glow = 1 - k * 0.6; });
     } else {
       snd.sfx('yum');
       snd.sfx(b.who, { mood: 'yum' });
       who.setFace(b.who === 'mama' ? 'mama_laugh' : 'girl_happy');
       who.jump(0.7);
-      fx.hearts(q.x, q.y + q.d * 0.2, 2, 'over');
-      fx.sparkle(q.x, q.y, 8, q.d * 0.4, 'over');
+      bubbles.hearts(b.who, 2);
+      bubbles.sparkle(b.who, 8);
       await wait(0.6);
     }
     // spoon reappears at rest
@@ -190,20 +216,20 @@ export default function eat(carry) {
       g.addColorStop(0, 'rgba(255,255,255,0.18)'); g.addColorStop(1, 'rgba(60,30,10,0.35)');
       ctx.fillStyle = g; ctx.fillRect(-rx, -ry, rx * 2, ry * 2);
       ctx.restore();
-      if (spoon.top) spr(ctx, spoon.top, spoon.x, spoon.y, 48 * k, { rot: spoon.rot, alpha: spoon.a, sa: 0.6 });
+      if (spoon.top) spr(ctx, spoon.top, spoon.x, spoon.y, spoon.w * 0.62 * k, { rot: spoon.rot, alpha: spoon.a, sa: 0.6 });
     }
   }
 
   return {
     enter() {
+      if (!carry) bubbles.setHomes(serveLayout().F.bub);
       bubbles.mama.show('mama_smile'); bubbles.girl.show('girl_smile');
-      if (!carry) { plate.x = PLATE_SERVE.x; plate.y = PLATE_SERVE.y; plate.w = PLATE_SERVE.w; }
       enter();
     },
     update(dt) {
       psq.update(dt); plate.sq = psq.x;
       steamT -= dt;
-      if (steamT <= 0 && food > 0.2) { steamT = 0.3; fx.steam(plate.x + rnd.range(-120, 120), plate.y + rnd.range(-90, 90), { size: 45, alpha: 0.28 * food, life: 2 }); }
+      if (steamT <= 0 && food > 0.2) { steamT = 0.3; fx.steam(plate.x + rnd.range(-0.2, 0.2) * plate.w, plate.y + rnd.range(-0.15, 0.15) * plate.w, { size: plate.w * 0.075, alpha: 0.28 * food, life: 2 }); }
     },
     draw(ctx) {
       drawTable(ctx);

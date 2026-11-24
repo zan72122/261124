@@ -7,20 +7,24 @@ import { fx, hint } from '../fx.js';
 import { bubbles } from '../bubbles.js';
 import { snd } from '../snd.js';
 import { game, phase, wait, anim } from '../game.js';
-import { POT, createPot, fillPot, drawStove, drawPot, initMix, mixRotate, mixDeposit, mixRaise, mixFill, mixMeasure } from '../potview.js';
+import { POT, planPot, createPot, fillPot, drawStove, drawPot, initMix, mixRotate, mixDeposit, mixRaise, mixFill, mixMeasure } from '../potview.js';
 import { playStirVideo } from '../video.js';
 
-const TRAY = { x: 500, y: 835, w: 220 };
-const DISH_W = 285;
+let TRAY = { x: 500, y: 835, w: 220 };
+let DISH_W = 285;
 // quadrant centres of the roux bar (normalised to the tray image)
 const QUADS = [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]];
 
 export default function roux(carry) {
+  const F = planPot();
+  DISH_W = F.roux.w;
+  TRAY = { x: F.roux.x, y: F.roux.y, w: F.roux.w * 0.77 };
   const pv = carry && carry.pieces ? carry : createPot();
+  const offY = LAY.ey1 + DISH_W;
   const loops = pv.loops || {};
   const L = (name) => loops[name] || (loops[name] = snd.loop(name));
   let step = 'tray';
-  const tray = { y: 1300, broken: [false, false, false, false] };
+  const tray = { y: offY, broken: [false, false, false, false] };
   const blocks = [];  // { name, x, y, h, w, rot, d (dissolved 0..1), inPot }
   let taps = 0;
   const spat = { x: 0, y: 0, vis: 0, h: 0 };
@@ -38,7 +42,7 @@ export default function roux(carry) {
     phase('roux-tray');
     game.block = true;
     snd.sfx('slide');
-    await anim(0.6, (k) => { tray.y = lerp(1300, TRAY.y, k); }, ease.outCubic);
+    await anim(0.6, (k) => { tray.y = lerp(offY, TRAY.y, k); }, ease.outCubic);
     game.block = false;
     step = 'blocks';
     phase('roux-0');
@@ -65,7 +69,7 @@ export default function roux(carry) {
     const r0 = rnd.range(-0.6, 0.6);
     anim(0.55, (k) => {
       b.x = lerp(q.x, tx, ease.inOutQuad(k)); b.y = lerp(q.y, ty, ease.inOutQuad(k));
-      b.h = Math.sin(k * Math.PI) * 260; b.rot = r0 * k; b.w = lerp(TRAY.w * 0.48, 86, k);
+      b.h = Math.sin(k * Math.PI) * 260; b.rot = r0 * k; b.w = lerp(TRAY.w * 0.48, 86 * POT.outerR / 280, k);
     }).then(() => {
       b.h = 0; b.inPot = true; b.sq.kick(4);
       snd.sfx('plop');
@@ -83,7 +87,7 @@ export default function roux(carry) {
   async function startStir() {
     initMix(pv);
     // tray dish slides away, spatula appears in the pot
-    anim(0.5, (k) => { tray.y = lerp(TRAY.y, 1350, k); }, ease.inCubic);
+    anim(0.5, (k) => { tray.y = lerp(TRAY.y, offY + 50, k); }, ease.inCubic);
     const g = pv.g;
     spat.x = g.ix + g.ir * 0.4; spat.y = g.iy + g.ir * 0.2;
     snd.sfx('whoosh', { vol: 0.5 });
@@ -102,6 +106,7 @@ export default function roux(carry) {
     game.block = true;
     phase('curry');
     mixFill(pv);
+    pv.mix.thick = 1;
     for (const b of blocks) b.d = 1;
     L('stir').stop(0.4);
     L('thick').set(0.7, 0.6);
@@ -146,7 +151,7 @@ export default function roux(carry) {
   function drawSpatula(ctx) {
     if (spat.vis <= 0.01) return;
     const s = size('spatula');
-    const W = 330, H = W * s.h / s.w;
+    const W = 330 * pv.g.ir / 263, H = W * s.h / s.w;
     const hd = geo('spatula', 'head', { x: 0.78, y: 0.16 }), gp = geo('spatula', 'grip', { x: 0.12, y: 0.92 });
     const vx = (gp.x - hd.x) * W, vy = (gp.y - hd.y) * H;
     const want = Math.PI / 4 + (spat.x - pv.g.ix) / pv.g.ir * 0.25;
@@ -168,13 +173,14 @@ export default function roux(carry) {
     smTan += (Math.abs(frameDA) * r / dt - smTan) * sm;
     const speed = stirring ? smSpeed : 0;
     const circ = speed > 1 ? clamp(smTan / speed, 0, 1) : 0;
-    const energy = stirring ? clamp(speed / 450, 0, 1) * (0.5 + 0.5 * circ) : 0;
+    const fp = g.ir / 263; // speeds/brushes were tuned for the old, smaller pot
+    const energy = stirring ? clamp(speed / (450 * fp), 0, 1) * (0.5 + 0.5 * circ) : 0;
     if (stirring) {
       const da = clamp(frameDA * 0.55, -0.16, 0.16);
       if (Math.abs(da) > 0.0005) mixRotate(pv, da * 0.6, r, g.ir * 0.22, da * 0.7);
       m.texAng += da * 0.5;
       for (const p of pv.pieces) if (p.float) { p.pa += da * 0.8; }
-      if (frameDist > 2) mixDeposit(pv, spat.x, spat.y, 36, 0.05 + 0.25 * clamp(blocks.reduce((s, b) => s + b.d, 0) / 4, 0, 1) * energy);
+      if (frameDist > 2) mixDeposit(pv, spat.x, spat.y, 46 * fp, 0.16 + 0.42 * clamp(blocks.reduce((s, b) => s + b.d, 0) / 4, 0, 1) * energy);
       L('stir').set(clamp(speed / 900, 0.1, 1), 0.08);
     } else {
       L('stir').set(0, 0.25);
@@ -190,17 +196,19 @@ export default function roux(carry) {
         const rr = Math.hypot(b.x - g.ix, b.y - g.iy);
         b.x = g.ix + Math.cos(a) * rr; b.y = g.iy + Math.sin(a) * rr;
       }
-      mixDeposit(pv, b.x, b.y, 40 + b.d * 70, (0.06 + energy * 0.12) * (1 - b.d * 0.5));
+      mixDeposit(pv, b.x, b.y, (40 + b.d * 70) * fp, (0.12 + energy * 0.26) * (1 - b.d * 0.5));
     }
-    // slow uniform thickening proportional to stirring (~9 s of good stirring completes it)
-    mixRaise(pv, energy * 0.12 * dt);
+    // brown spreads everywhere (~6 s), then the chunky curry sets (completes at ~9 s of good stirring)
+    if (m.base < 1.02) mixRaise(pv, energy * 0.135 * dt);
+    if (m.mean > 0.75) m.thick = Math.min(1, m.thick + energy * 0.3 * dt);
     if (energy > 0.05) hint.progress();
     measureT -= dt;
     if (measureT <= 0) {
       measureT = 0.3;
       const mean = mixMeasure(pv);
       pv.broth = 1;
-      if (step === 'stir' && (mean >= 0.97 || m.base >= 1.02)) complete();
+      if (step === 'stir' && (mean >= 0.97 || m.base >= 1.02) && mean < 1) mixFill(pv);
+      if (step === 'stir' && m.mean >= 0.97 && m.thick >= 1) complete();
     }
     if (stirring && energy > 0.2 && rnd() < dt * 3) fx.steam(g.ix + rnd.range(-120, 120), g.iy + rnd.range(-120, 120), { size: 50, alpha: 0.3, life: 1.6 });
     frameDA = 0; frameDist = 0;
@@ -208,6 +216,7 @@ export default function roux(carry) {
 
   return {
     enter() {
+      bubbles.setHomes(F.bub);
       bubbles.mama.show('mama_smile'); bubbles.girl.show('girl_wow');
       L('flame').set(0.6, 0.4); L('simmer').set(0.6, 0.6);
       pv.water = 0;
@@ -233,7 +242,7 @@ export default function roux(carry) {
     },
     draw(ctx) {
       drawStove(ctx, pv);
-      if (tray.y < 1250) {
+      if (tray.y < offY) {
         spr(ctx, 'dish', TRAY.x, tray.y, DISH_W, {});
         drawTray(ctx);
       }

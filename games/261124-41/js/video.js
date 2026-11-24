@@ -46,6 +46,7 @@ export function playStirVideo({ onStart } = {}) {
     function begin() {
       if (started || finished) return;
       started = true;
+      bubbles.girl.pulse = 0;
       v.style.opacity = '1';
       stir = snd.playStir();
       if (onStart) onStart();
@@ -73,23 +74,25 @@ export function playStirVideo({ onStart } = {}) {
     };
     if (v.readyState >= 3) tryPlay(); else { v.addEventListener('canplay', tryPlay); if (v.readyState === 0) v.load(); tryPlay(); }
     poll();
-    timers.push(setTimeout(() => { if (!started) fail(); }, 1500));
+    // real iPhones can take a while to start; the girl bubble keeps pulsing meanwhile
+    bubbles.girl.pulse = 1;
+    timers.push(setTimeout(() => { if (!started) fail(); }, 4000));
   });
 }
 
 // enlarged happy girl bubble with hearts instead of the video
 function fallback(resolve) {
   const g = bubbles.girl;
+  g.pulse = 0;
   g.setFace('girl_happy');
   g.jump(1);
   const p = g.pos();
   let n = 0;
   const id = setInterval(() => {
-    const q = g.pos();
-    fx.hearts(q.x + (Math.random() - 0.5) * q.d * 0.8, q.y + q.d * 0.2, 2, 'over', 1.4);
+    bubbles.hearts('girl', 2, 1.2);
     if (++n > 8) clearInterval(id);
   }, 220);
-  fx.sparkle(p.x, p.y, 16, p.d * 0.5, 'over');
+  fx.sparkleRing(p.x, p.y, p.d * 0.56, 16);
   snd.sfx('heart');
   setTimeout(() => resolve(false), 2000);
 }

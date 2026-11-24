@@ -15,6 +15,8 @@ function shadowSprite() {
   return SHADOW;
 }
 
+let homes = null;
+
 class Bubble {
   constructor(who, side) {
     this.who = who; this.side = side;
@@ -29,11 +31,13 @@ class Bubble {
     this.jy = new Spring(160, 9);    // jump offset
     this.rk = new Spring(120, 6);    // rock
     this.talkT = 0; this.wobT = 0; this.droop = 0; this.glow = 0; this.rockAmp = 0; this.bob = 1; this.t = Math.random() * 5;
-    this.bow = 0;
+    this.bow = 0; this.boost = 0; this.pulse = 0;
   }
+  // scenes set their homes from layout.frame(); otherwise the screen corners
   home() {
-    const d = Math.max(220, 84 / L.u);
-    const m = 16;
+    if (homes && homes[this.who]) return homes[this.who];
+    const d = Math.max(300, 110 / L.u);
+    const m = 22;
     return { x: this.side < 0 ? L.sl + m + d / 2 : L.sr - m - d / 2, y: L.st + m + d / 2, d };
   }
   // current base placement (without bob/jump)
@@ -74,7 +78,7 @@ class Bubble {
     if (this.vis <= 0.001) return;
     const p = this.pos();
     const appear = this.visTarget > 0 ? ease.outBack(this.vis) : ease.inCubic(this.vis);
-    const r = p.d / 2 * appear;
+    const r = p.d / 2 * appear * (1 + this.boost) * (1 + Math.sin(this.t * 6) * 0.05 * this.pulse);
     if (r < 1) return;
     let sx = 1 + this.sq.x * 0.06, sy = 1 - this.sq.x * 0.06;
     if (this.talkT > 0) { const k = Math.sin(this.t * 22) * 0.025; sx += k; sy -= k; }
@@ -127,22 +131,24 @@ function drawFace(ctx, name, r, a) {
 // ---------------------------------------------------------------- thought bubble (girl imagines curry)
 const thought = {
   vis: 0, target: 0, name: null, t: 0,
-  show(name) { this.name = name; this.target = 1; this.t = 0; },
+  show(name, spot) { this.name = name; this.spot = spot || null; this.target = 1; this.t = 0; },
   hide() { this.target = 0; },
   update(dt) { this.t += dt; this.vis = clamp(this.vis + (this.target ? dt * 2.2 : -dt * 3), 0, 1); },
   draw(ctx, from) {
     if (this.vis <= 0.001) return;
     const d = from.d;
-    // place toward the screen/stage centre from the girl bubble
-    let cx = from.x - d * 0.95, cy = from.y + d * 0.9;
-    const R = d * 0.62;
-    cx = clamp(cx, L.ex0 + R * 1.4, L.ex1 - R * 1.4); cy = clamp(cy, L.ey0 + R * 1.4, L.ey1 - R * 1.4);
+    // spot chosen by the scene (free space that does not cover the basket); default beside the girl
+    const sp = this.spot || { x: from.x - d * 1.1, y: from.y + d * 0.9, R: d * 0.55 };
+    const cx = sp.x, cy = sp.y, R = sp.R;
     // trailing dots
     for (let i = 0; i < 3; i++) {
       const tt = (i + 1) / 4;
       const vis = clamp(this.vis * 3 - i * 0.5, 0, 1);
       if (vis <= 0) continue;
-      const x = lerp(from.x - d * 0.35, cx + R * 0.6, tt), y = lerp(from.y + d * 0.35, cy - R * 0.5, tt);
+      const ang = Math.atan2(cy - from.y, cx - from.x);
+      const sx = from.x + Math.cos(ang) * d * 0.55, sy = from.y + Math.sin(ang) * d * 0.55;
+      const ex = cx - Math.cos(ang) * R * 1.15, ey = cy - Math.sin(ang) * R * 1.0;
+      const x = lerp(sx, ex, tt), y = lerp(sy, ey, tt);
       const rr = d * (0.05 + i * 0.03) * vis;
       ctx.fillStyle = 'rgba(40,20,0,0.18)'; ctx.beginPath(); ctx.arc(x + 4, y + 6, rr, 0, TAU); ctx.fill();
       ctx.fillStyle = '#fffaf0'; ctx.beginPath(); ctx.arc(x, y, rr, 0, TAU); ctx.fill();
@@ -170,7 +176,8 @@ export const bubbles = {
   mama: new Bubble('mama', -1),
   girl: new Bubble('girl', 1),
   thought,
-  reset() { this.mama.reset(); this.girl.reset(); thought.vis = 0; thought.target = 0; },
+  reset() { this.mama.reset(); this.girl.reset(); thought.vis = 0; thought.target = 0; homes = null; },
+  setHomes(h) { homes = h || null; },
   update(dt) { this.mama.update(dt); this.girl.update(dt); thought.update(dt); },
   draw(ctx) {
     this.mama.draw(ctx);
@@ -184,6 +191,31 @@ export const bubbles = {
   },
   heartBetween() {
     const a = this.mama.pos(), b = this.girl.pos();
-    fx.flyHeart(a.x + a.d * 0.3, a.y + a.d * 0.1, b.x - b.d * 0.3, b.y + b.d * 0.1, 30);
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    fx.flyHeart(a.x + Math.cos(ang) * a.d * 0.62, a.y + Math.sin(ang) * a.d * 0.62, b.x - Math.cos(ang) * b.d * 0.62, b.y - Math.sin(ang) * b.d * 0.62, a.d * 0.14);
+  },
+  // emotes start at the rim on the side facing the screen centre and float away from the face
+  rim(who, spread = 0.6) {
+    const p = this[who].pos();
+    // away from the partner bubble (so nothing lands on the other face), biased upward
+    const o = this[who === 'mama' ? 'girl' : 'mama'].pos();
+    const base = Math.atan2(p.y - o.y, p.x - o.x);
+    const up = -Math.PI / 2;
+    const a = Math.atan2(Math.sin(base) + Math.sin(up) * 1.4, Math.cos(base) + Math.cos(up) * 1.4) + (Math.random() - 0.5) * spread;
+    return { x: p.x + Math.cos(a) * p.d * 0.6, y: p.y + Math.sin(a) * p.d * 0.6, a, d: p.d, cx: p.x, cy: p.y };
+  },
+  hearts(who, n = 2, big = 1) {
+    for (let i = 0; i < n; i++) {
+      const r = this.rim(who, 1.2);
+      fx.heartAt(r.x, r.y, Math.cos(r.a) * 70, Math.sin(r.a) * 70 - 90, r.d * 0.1 * big, i * 0.14);
+    }
+  },
+  sparkle(who, n = 10) {
+    const p = this[who].pos();
+    fx.sparkleRing(p.x, p.y, p.d * 0.56, n);
+  },
+  rays(who, color = '#fff0a0') {
+    const p = this[who].pos();
+    fx.burst(p.x, p.y, p.d * 0.55 * (1 + this[who].boost), color);
   },
 };

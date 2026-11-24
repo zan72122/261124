@@ -6,7 +6,7 @@ import { fx, hint } from '../fx.js';
 import { bubbles } from '../bubbles.js';
 import { snd } from '../snd.js';
 import { game, phase, wait, anim } from '../game.js';
-import { BOARD } from './cut.js';
+import { BOARD, boardFrame, W, applyT } from './cut.js';
 
 const SIZE = 190;
 const R = SIZE * 0.43;
@@ -39,6 +39,8 @@ export function drawCutter(ctx, kind, x, y, r, h, rot = 0) {
 
 export default function stamp() {
   let t = 0;
+  const T = boardFrame();
+  const fxp = (x, y) => W(T, x, y);
   const rounds = SPOTS.map(([x, y], i) => ({ x, y, name: 'carrot_slice_' + (1 + (i % 3)), rot: rnd() * TAU, shape: null, sq: new Spring(260, 9), ring: null }));
   const cutter = { x: 500, y: 1200, h: 140, kind: 'flower' };
   let count = 0, busy = false, done = false;
@@ -56,7 +58,7 @@ export default function stamp() {
     r.shape = { kind: cutter.kind, name: 'carrot_' + cutter.kind };
     r.ring = { dx: 0, dy: 0, a: 1, dir: rnd() * TAU };
     r.sq.kick(-3);
-    fx.specks(r.x, r.y, 6, 'rgba(255,140,40,0.85)', 200, 4);
+    { const q = fxp(r.x, r.y); fx.specks(q.x, q.y, 6, 'rgba(255,140,40,0.85)', 200 * T.k, 4 * T.k); }
     count++;
     await wait(0.08);
     anim(0.25, (k) => { cutter.h = 140 * k; }, ease.outQuad);
@@ -64,13 +66,13 @@ export default function stamp() {
     const ring = r.ring, dir = Math.atan2(r.y - 560, r.x - 500) + rnd.range(-0.4, 0.4);
     anim(0.7, (k) => { ring.dx = Math.cos(dir) * 70 * k; ring.dy = Math.sin(dir) * 70 * k; ring.a = 1 - k; }, ease.outCubic, 0.1);
     r.sq.kick(6);
-    fx.sparkle(r.x, r.y, 8, 90);
+    { const q = fxp(r.x, r.y); fx.sparkle(q.x, q.y, 8, 90 * T.k); }
     snd.sfx('sparkle', { vol: 0.6, pitch: 1 + count * 0.06 });
     bubbles.girl.setFace(count % 2 ? 'girl_happy' : 'girl_wow');
     await wait(0.3);
     busy = false;
     const n = nextRound();
-    if (n) { cutter.kind = ORDER[count]; phase('stamp-' + (count + 1)); hint.set({ type: 'tap', x: n.x, y: n.y, r: SIZE * 0.6 }); }
+    if (n) { cutter.kind = ORDER[count]; phase('stamp-' + (count + 1)); hint.set({ type: 'tap', x: fxp(n.x, n.y).x, y: fxp(n.x, n.y).y, r: SIZE * 0.6 * T.k }); }
     else finish();
   }
 
@@ -82,7 +84,7 @@ export default function stamp() {
     anim(0.5, (k) => { cutter.y = lerp(cutter.y, 1300, k); cutter.h = 140 + k * 100; }, ease.inCubic);
     await wait(0.4);
     snd.sfx('sparkle');
-    for (const r of rounds) fx.sparkle(r.x, r.y, 6, 80);
+    for (const r of rounds) { const q = fxp(r.x, r.y); fx.sparkle(q.x, q.y, 6, 80 * T.k); }
     await wait(0.3);
     snd.sfx('success');
     bubbles.girl.setFace('girl_wow'); bubbles.girl.jump(1);
@@ -93,11 +95,12 @@ export default function stamp() {
 
   return {
     enter() {
+      bubbles.setHomes(T.F.bub);
       bubbles.mama.show('mama_smile'); bubbles.girl.show('girl_focus');
       phase('stamp-1');
       const n = nextRound();
       anim(0.5, (k) => { cutter.x = lerp(500, n.x, k); cutter.y = lerp(1200, n.y, k); }, ease.outCubic);
-      hint.set({ type: 'tap', x: n.x, y: n.y, r: SIZE * 0.6 });
+      hint.set({ type: 'tap', x: fxp(n.x, n.y).x, y: fxp(n.x, n.y).y, r: SIZE * 0.6 * T.k });
     },
     update(dt) {
       t += dt;
@@ -109,6 +112,8 @@ export default function stamp() {
     },
     draw(ctx) {
       backdrop(ctx, 'bg_counter', 500, 500, 1600);
+      ctx.save();
+      applyT(ctx, T);
       spr(ctx, 'board', BOARD.x, BOARD.y, BOARD.w);
       for (const r of rounds) {
         const q = r.sq.x * 0.04;
@@ -126,11 +131,17 @@ export default function stamp() {
         const pop = 1 + q * 1.5;
         spr(ctx, r.shape.name, r.x, r.y, R * 2.05, { sx: pop, sy: pop, h: Math.max(0, r.sq.x * 6) });
       }
+      ctx.restore();
     },
     drawTop(ctx) {
-      if (count < ORDER.length || cutter.y < 1100) drawCutter(ctx, cutter.kind, cutter.x, cutter.y, R, cutter.h + (busy ? 0 : Math.sin(t * 3) * 8));
+      if (count >= ORDER.length && cutter.y >= 1100) return;
+      ctx.save();
+      applyT(ctx, T);
+      drawCutter(ctx, cutter.kind, cutter.x, cutter.y, R, cutter.h + (busy ? 0 : Math.sin(t * 3) * 8));
+      ctx.restore();
     },
-    down(p) {
+    down(p0) {
+      const p = { x: BOARD.x + (p0.x - T.ox) / T.k, y: BOARD.y + (p0.y - T.oy) / T.k };
       if (busy || done) return;
       let target = null, best = 1e9;
       for (const r of rounds) {

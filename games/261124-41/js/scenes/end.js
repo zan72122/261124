@@ -1,14 +1,48 @@
-// end — snuggle, a red hanamaru over the clean plate, fanfare, (story illustration), replay.
-import { TAU, rnd, ease, lerp, canvas2d, L } from '../engine.js';
-import { cover, rrect } from '../sprite.js';
-import { has } from '../assets.js';
+// end — snuggle, a red hanamaru over the clean plate, fanfare, replay. (story_hug will never exist: not used.)
+import { TAU, rnd, ease, lerp, canvas2d } from '../engine.js';
 import { fx, drawButton } from '../fx.js';
 import { bubbles } from '../bubbles.js';
 import { snd } from '../snd.js';
 import { game, phase, wait, anim } from '../game.js';
 import { createPlate, drawPlate } from '../plate.js';
-import { drawTable, drawSpoon } from './serve.js';
-import { PLATE_EAT, SPOON_EAT, SEATS } from './eat.js';
+import { drawTable } from './serve.js';
+import { eatLayout } from './eat.js';
+import { safe, M } from '../layout.js';
+
+const RB = 115; // replay button radius (≈230 diameter)
+
+// the snuggling pair (≈360, overlapping) and the hanamaru plate are the centre; replay in a free band
+function endLayout() {
+  const E = safe();
+  const o = {};
+  if (E.h >= E.w) {
+    const d = Math.min(360, (E.w - 2 * M) / 1.9);
+    const pw = Math.min(780, E.w - 2 * M, E.h - d - 2 * RB - 5 * M);
+    const group = d + M + pw + M + 2 * RB;
+    const y0 = E.y0 + Math.max(M, (E.h - group) / 2);
+    o.pair = { x: E.cx, y: y0 + d / 2, d };
+    o.plate = { x: E.cx, y: y0 + d + M + pw / 2, w: pw };
+    o.replay = { x: E.cx, y: o.plate.y + pw / 2 + M + RB };
+    return o;
+  }
+  const pw = Math.min(780, E.h - 2 * M);
+  for (const d of [360, 330, 300, 270]) {
+    const need = 1.9 * d + pw + 2 * RB + 4 * M;
+    if (need > E.w) continue;
+    const x0 = E.cx - need / 2 + M;
+    o.pair = { x: x0 + 0.95 * d, y: E.cy, d };
+    o.plate = { x: x0 + 1.9 * d + M + pw / 2, y: E.cy, w: pw };
+    o.replay = { x: o.plate.x + pw / 2 + M + RB, y: E.cy };
+    return o;
+  }
+  const pw2 = Math.min(780, E.h - 2 * RB - 3 * M);
+  const d = Math.min(360, (E.w - pw2 - 3 * M) / 1.9);
+  const gw = 1.9 * d + M + pw2, x0 = E.cx - gw / 2;
+  o.pair = { x: x0 + 0.95 * d, y: E.cy, d };
+  o.plate = { x: x0 + 1.9 * d + M + pw2 / 2, y: E.y0 + M + pw2 / 2, w: pw2 };
+  o.replay = { x: o.plate.x, y: o.plate.y + pw2 / 2 + M + RB };
+  return o;
+}
 
 const HS = 560; // hanamaru canvas size (px) covering 2*EXT units
 const EXT = 300;
@@ -53,14 +87,14 @@ function grain() {
 
 export default function end(carry) {
   let t = 0, fanT = -1, steamT = 0;
-  const plate = carry && carry.plate ? carry.plate : createPlate(PLATE_EAT.x, PLATE_EAT.y, PLATE_EAT.w);
+  const EL = endLayout();
+  const plate = carry && carry.plate ? carry.plate : (() => { const p = eatLayout().plate; return createPlate(p.x, p.y, p.w); })();
   plate.state = 'empty'; plate.eaten = null; plate.shapes = [];
   const pts = hanamaruPts(520 * 0.36);
   const H = canvas2d(HS, HS);
   const G = grain();
   let hk = 0, drawnK = -1;
-  let hug = 0, replay = 0, replayOn = false;
-  const D = 250;
+  let replay = 0, replayOn = false;
 
   function renderHanamaru() {
     if (drawnK === hk) return;
@@ -88,16 +122,16 @@ export default function end(carry) {
     game.block = true;
     phase('snuggle');
     const m = bubbles.mama, g = bubbles.girl;
-    m.place({ x: 500 - D / 2, y: 195, d: D }, 1.1);
-    g.place({ x: 500 + D / 2, y: 195, d: D }, 1.1);
+    const P = EL.pair, d = P.d;
+    m.place({ x: P.x - d * 0.45, y: P.y, d }, 1.1);
+    g.place({ x: P.x + d * 0.45, y: P.y, d }, 1.1);
     m.setFace('mama_laugh'); g.setFace('girl_happy');
-    // plate settles a little smaller to leave room for the replay button below it
     const x0 = plate.x, y0 = plate.y, w0 = plate.w;
-    await anim(1.1, (k) => { plate.x = lerp(x0, 500, k); plate.y = lerp(y0, 600, k); plate.w = lerp(w0, 520, k); }, ease.inOutCubic);
+    await anim(1.1, (k) => { plate.x = lerp(x0, EL.plate.x, k); plate.y = lerp(y0, EL.plate.y, k); plate.w = lerp(w0, EL.plate.w, k); }, ease.inOutCubic);
     m.rk.kick(-3); g.rk.kick(3);
     m.rockAmp = 0.05; g.rockAmp = -0.05;
     snd.sfx('heart');
-    fx.hearts(500, 140, 1, 'over', 2.6);
+    fx.heartAt(P.x, P.y - d * 0.55, 0, -60, d * 0.16);
     await wait(0.8);
     phase('hanamaru');
     snd.sfx('hanamaru');
@@ -112,12 +146,7 @@ export default function end(carry) {
     fx.rain(['carrot_flower', 'carrot_star', 'carrot_heart'], 16);
     fx.sparkle(plate.x, plate.y, 24, plate.w * 0.4, 'over');
     m.jump(1); g.jump(1);
-    if (has('story_hug')) {
-      await wait(3.5);
-      phase('story');
-      await anim(1.2, (k) => { hug = k; }, ease.inOutSine);
-      await wait(1.3);
-    } else await wait(6);
+    await wait(6);
     phase('replay');
     replayOn = true;
     anim(0.8, (k) => { replay = k; });
@@ -127,11 +156,11 @@ export default function end(carry) {
   return {
     enter() {
       bubbles.mama.show('mama_laugh'); bubbles.girl.show('girl_happy');
-      if (!carry) { bubbles.mama.place(SEATS.mama, 0); bubbles.girl.place(SEATS.girl, 0); }
+      if (!carry) { const s = eatLayout().seats; bubbles.mama.place(s.mama, 0); bubbles.girl.place(s.girl, 0); }
       script();
     },
     exit() {
-      for (const b of [bubbles.mama, bubbles.girl]) { b.rockAmp = 0; b.glow = 0; }
+      for (const b of [bubbles.mama, bubbles.girl]) { b.rockAmp = 0; b.glow = 0; b.boost = 0; }
     },
     update(dt) {
       t += dt;
@@ -141,7 +170,7 @@ export default function end(carry) {
         if (steamT <= 0) {
           steamT = 1.2;
           bubbles.mama.jump(0.35); game.clock.after(0.2, () => bubbles.girl.jump(0.35));
-          if (fanT < 12) fx.hearts(rnd.range(L.ex0 + 100, L.ex1 - 100), rnd.range(400, 900), 1, 'over', 1.2);
+          if (fanT < 12) { const P = EL.pair; fx.heartAt(P.x + rnd.range(-0.3, 0.3) * P.d, P.y - P.d * 0.55, rnd.range(-40, 40), -80, P.d * 0.1); }
         }
         if (fanT > 3 && rnd() < dt * 0.6) { fx.petals(2); }
       }
@@ -149,36 +178,20 @@ export default function end(carry) {
     draw(ctx) {
       drawTable(ctx);
       drawPlate(ctx, plate);
-      drawSpoon(ctx, SPOON_EAT.x, SPOON_EAT.y, SPOON_EAT.rot, SPOON_EAT.w);
       if (hk > 0) {
         renderHanamaru();
+        const e = EXT * plate.w / 520; // the mark was authored for a 520-wide plate
         ctx.save();
         ctx.globalCompositeOperation = 'multiply';
-        ctx.drawImage(H, plate.x - EXT, plate.y - EXT, EXT * 2, EXT * 2);
+        ctx.drawImage(H, plate.x - e, plate.y - e, e * 2, e * 2);
         ctx.restore();
         ctx.globalAlpha = 0.35;
-        ctx.drawImage(H, plate.x - EXT, plate.y - EXT, EXT * 2, EXT * 2);
+        ctx.drawImage(H, plate.x - e, plate.y - e, e * 2, e * 2);
         ctx.globalAlpha = 1;
       }
     },
     drawOverlay(ctx) {
-      if (hug > 0) {
-        const m = 22;
-        const x = L.ex0 + m, y = L.ey0 + m, w = L.ex1 - L.ex0 - m * 2, h = L.ey1 - L.ey0 - m * 2;
-        ctx.save();
-        ctx.globalAlpha = hug;
-        ctx.fillStyle = 'rgba(40,20,5,0.5)';
-        ctx.fillRect(L.ex0, L.ey0, L.ex1 - L.ex0, L.ey1 - L.ey0);
-        ctx.fillStyle = '#fff3dc';
-        rrect(ctx, x - 14, y - 14, w + 28, h + 28, 46); ctx.fill();
-        ctx.save(); rrect(ctx, x, y, w, h, 34); ctx.clip();
-        cover(ctx, 'story_hug', x, y, w, h, 1.02 + Math.sin(t * 0.2) * 0.02);
-        ctx.restore();
-        ctx.restore();
-        if (rnd() < 0.05) fx.hearts(rnd.range(L.ex0 + 80, L.ex1 - 80), L.ey1 - rnd.range(60, 300), 1, 'over', 1.4);
-        fx.drawParts(ctx, 'over');
-      }
-      if (replay > 0) drawButton(ctx, 500, 925, 70, 'replay', t, replay);
+      if (replay > 0) drawButton(ctx, EL.replay.x, EL.replay.y, RB, 'replay', t, replay);
     },
     down() {
       if (!replayOn) return;

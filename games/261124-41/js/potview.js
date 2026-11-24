@@ -4,8 +4,22 @@ import { TAU, rnd, clamp, Spring, canvas2d, ease } from './engine.js';
 import { spr, backdrop, tint } from './sprite.js';
 import { img, size, geo } from './assets.js';
 import { softBlob } from './fx.js';
+import { frame, slotCentre, M } from './layout.js';
 
-export const POT = { x: 500, y: 415, outerR: 280 };
+export const POT = { x: 500, y: 415, outerR: 350 };
+
+// pot (≈700 outer diameter) fills the short side; dishes / jug / roux dish go in the free band
+export function planPot() {
+  const F = frame({ w: 842, h: 800 }, ['meat', 'onion', 'potato', 'carrot'], { sec: 230, minSec: 210 });
+  POT.x = F.px; POT.y = F.py; POT.outerR = 350 * F.k;
+  const side = F.mode === 'side';
+  const right = slotCentre(F, ['potato', 'carrot']);
+  const mid = side ? slotCentre(F, ['meat', 'onion']) : slotCentre(F, ['onion', 'potato']);
+  const s = F.slots.meat.s;
+  F.jug = { x: right.x, y: right.y, w: side ? Math.min(s * 1.35, F.sideW - 2 * M) : s * 1.35 };
+  F.roux = { x: mid.x, y: mid.y, w: side ? Math.min(s * 1.2, F.sideW - 2 * M) : s * 1.2 };
+  return F;
+}
 
 export function potGeom() {
   const o = geo('pot', 'outer', { cx: 0.5, cy: 0.5, r: 0.38 });
@@ -48,8 +62,8 @@ export function createPot() {
 // standard full set of pieces (for starting a later scene directly)
 export function fillPot(pv, cooked = true) {
   const spots = potSpots(pv, 26);
-  const add = (name, w, extra = {}) => {
-    const s = spots.shift();
+  const add = (name, w0, extra = {}) => {
+    const s = spots.shift(), w = w0 * POT.outerR / 280;
     pv.pieces.push(Object.assign({ name, x: s.x, y: s.y, rot: rnd() * TAU, w, cook: cooked ? 1 : 0, float: false, sq: new Spring(260, 10), bob: rnd() * TAU }, extra));
   };
   for (let i = 0; i < 5; i++) add('meat_raw_' + (1 + (i % 3)), 74, { cooked: 'meat_cooked_' + (1 + (i % 3)) });
@@ -146,7 +160,7 @@ export function drawPot(ctx, pv) {
   drawSurface(ctx, pv);
   // the pot wall darkens toward the rim
   const sh = ctx.createRadialGradient(g.ix - g.ir * 0.1, g.iy - g.ir * 0.12, g.ir * 0.7, g.ix, g.iy, g.ir);
-  sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(10,5,0,0.28)');
+  sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(0.65, 'rgba(10,5,0,0.14)'); sh.addColorStop(1, 'rgba(10,5,0,0.5)');
   ctx.fillStyle = sh; ctx.fillRect(g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
   ctx.restore();
   if (pv.lid && pv.lid.alpha > 0) drawLid(ctx, pv);
@@ -233,7 +247,7 @@ function drawLid(ctx, pv) {
 const MS = 256, CS = 512;
 export function initMix(pv) {
   const M = canvas2d(MS, MS), T = canvas2d(MS, MS), C = canvas2d(CS, CS), S = canvas2d(16, 16);
-  pv.mix = { M, T, C, S, sx: S.getContext('2d', { willReadFrequently: true }), mean: 0, base: 0, pending: 0, texAng: 0, done: false };
+  pv.mix = { M, T, C, S, sx: S.getContext('2d', { willReadFrequently: true }), mean: 0, base: 0, pending: 0, texAng: 0, thick: 0, done: false };
 }
 // stage coords -> mask pixel coords
 function toM(pv, x, y) { const g = pv.g; return { x: ((x - g.ix) / (g.ir * 2) + 0.5) * MS, y: ((y - g.iy) / (g.ir * 2) + 0.5) * MS }; }
@@ -286,7 +300,7 @@ export function mixRaise(pv, amount) {
 export function mixFill(pv) {
   const mx = pv.mix.M.getContext('2d');
   mx.fillStyle = '#fff'; mx.fillRect(0, 0, MS, MS);
-  pv.mix.mean = 1;
+  pv.mix.mean = 1; pv.mix.base = Math.max(pv.mix.base, 1);
 }
 
 export function mixMeasure(pv) {
@@ -303,20 +317,39 @@ export function mixMeasure(pv) {
   return m.mean;
 }
 
+// Two stages: A = glossy brown sauce through the mix mask M (ribbons that follow the spoon),
+// B = the chunky curry photo through the same mask, faded in by m.thick (it "sets" in the last third).
 function drawMix(ctx, pv) {
   const m = pv.mix, g = pv.g;
   const cx = m.C.getContext('2d');
-  cx.save();
   cx.clearRect(0, 0, CS, CS);
-  cx.translate(CS / 2, CS / 2); cx.rotate(m.texAng);
-  // one texture drawn large enough to cover the mask at any rotation (mirrored tiling showed kaleidoscope seams)
-  const D = CS * 1.45;
-  cx.drawImage(img('tex_curry'), -D / 2, -D / 2, D, D);
-  cx.restore();
+  cx.fillStyle = 'rgba(122,66,22,0.86)';
+  cx.fillRect(0, 0, CS, CS);
+  const sh = cx.createRadialGradient(CS * 0.38, CS * 0.34, CS * 0.05, CS / 2, CS / 2, CS * 0.55);
+  sh.addColorStop(0, 'rgba(170,100,40,0.35)'); sh.addColorStop(1, 'rgba(60,28,6,0.35)');
+  cx.fillStyle = sh; cx.fillRect(0, 0, CS, CS);
   cx.globalCompositeOperation = 'destination-in';
   cx.drawImage(m.M, 0, 0, CS, CS);
   cx.globalCompositeOperation = 'source-over';
+  // drawn twice: thin ribbons already read as brown sauce instead of a pale tint
   ctx.drawImage(m.C, g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
+  ctx.drawImage(m.C, g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
+  if (m.thick > 0.005) {
+    cx.clearRect(0, 0, CS, CS);
+    cx.save();
+    cx.translate(CS / 2, CS / 2); cx.rotate(m.texAng);
+    // texture side ≈ 1.1 × the inner diameter: chunks match the real pieces, circle stays covered
+    const D = CS * 1.1;
+    cx.drawImage(img('tex_curry'), -D / 2, -D / 2, D, D);
+    cx.restore();
+    cx.globalCompositeOperation = 'destination-in';
+    cx.drawImage(m.M, 0, 0, CS, CS);
+    cx.globalCompositeOperation = 'source-over';
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, m.thick);
+    ctx.drawImage(m.C, g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
+    ctx.restore();
+  }
   // glossy swirl highlights rotating with the stir
   const a = clamp(m.mean * 1.2 - 0.1, 0, 1);
   if (a > 0) {
@@ -326,8 +359,8 @@ function drawMix(ctx, pv) {
     for (let i = 0; i < 4; i++) {
       const r = g.ir * (0.25 + i * 0.17);
       const st = m.texAng * (1.3 - i * 0.15) + i * 1.9;
-      ctx.strokeStyle = `rgba(255,235,200,${0.13 * a})`;
-      ctx.lineWidth = 10 - i;
+      ctx.strokeStyle = `rgba(255,232,190,${0.2 * a})`;
+      ctx.lineWidth = (10 - i) * g.ir / 220;
       ctx.beginPath(); ctx.arc(g.ix, g.iy, r, st, st + 0.7); ctx.stroke();
     }
     ctx.restore();

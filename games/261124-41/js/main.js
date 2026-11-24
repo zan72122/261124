@@ -5,6 +5,7 @@ import { fx, hint, drawIris } from './fx.js';
 import { bubbles } from './bubbles.js';
 import { snd } from './snd.js';
 import { game } from './game.js';
+import { layoutKey } from './layout.js';
 import { drawVectorCarrot } from './shapes.js';
 
 import title from './scenes/title.js';
@@ -28,19 +29,24 @@ let trans = null; // { k, dir, id, opts }
 let downDelivered = false;
 let bgmStarted = false;
 
-const debug = { get scene() { return game.id; }, get phase() { return game.phase; }, goto: (id) => go(id, { fade: false }), ready: false, toCss: unitsToCss };
+const debug = { get scene() { return game.id; }, get phase() { return game.phase; }, goto: (id) => go(id, { fade: false }), ready: false, toCss: unitsToCss,
+  // for automated play-throughs: where the hint currently points
+  hint: () => { const s = hint.spec; return s ? { type: s.type, x: hint.pos(s.x), y: hint.pos(s.y), x2: s.x2 != null ? hint.pos(s.x2) : null, y2: s.y2 != null ? hint.pos(s.y2) : null, r: s.r || 80 } : null; },
+  get block() { return game.block; } };
 window.__game = debug;
 
 if (game.params.get('mute') === '1') snd.setMuted(true);
 
-function resize() { layout(canvas); }
+function resize() { layout(canvas); if (loaded) checkRelayout(); }
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 120));
 if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 resize();
 
 // audio unlock must happen inside a user gesture: first pointerup AND touchend
+let warmed = false;
 const unlock = () => {
+  if (!warmed) { warmed = true; warmVideo(); }
   snd.unlock().then(() => {
     if (!bgmStarted && game.id && game.id !== 'title') { bgmStarted = true; snd.bgmStart(); }
   });
@@ -51,6 +57,29 @@ window.addEventListener('touchend', unlock, true);
 export function startBgm() { bgmStarted = true; snd.bgmStart(); }
 game.startBgm = startBgm;
 
+// iOS: start + pause the muted video inside the first gesture so it is fetched and decoded long before the cut-scene
+function warmVideo() {
+  const v = document.getElementById('v');
+  if (!v) return;
+  try {
+    v.muted = true;
+    const p = v.play();
+    const stop = () => { try { v.pause(); v.currentTime = 0; } catch (e) { /* ignore */ } };
+    if (p && p.then) p.then(stop, () => {}); else stop();
+  } catch (e) { /* ignore */ }
+}
+
+// rotation / big size change: restart the running scene so its layout is recomputed
+let layKey = '', relayTimer = 0;
+function checkRelayout() {
+  const k = layoutKey();
+  if (!layKey) { layKey = k; return; }
+  if (k === layKey) return;
+  layKey = k;
+  clearTimeout(relayTimer);
+  relayTimer = setTimeout(() => { if (loaded && game.id && !trans && !/cutscene/.test(game.phase)) go(game.id, { carry: null, fade: true }); }, 350);
+}
+
 function go(id, opts = {}) {
   if (!SCENES[id]) return;
   if (opts.fade === false) { switchTo(id, opts); return; }
@@ -60,7 +89,7 @@ function go(id, opts = {}) {
 game.goto = go;
 
 function switchTo(id, opts) {
-  if (game.scene && game.scene.exit) game.scene.exit();
+  if (game.scene && game.scene.exit) game.scene.exit(id);
   game.clock.clear();
   fx.clear();
   hint.clear();
@@ -165,6 +194,7 @@ raf = requestAnimationFrame(frame);
 fx.init();
 loadAssets((k) => { loadK = k; }).then(() => {
   loaded = true;
+  layKey = layoutKey();
   const want = game.params.get('scene');
   const first = want && ORDER.includes(want) ? want : 'title';
   switchTo(first, {});

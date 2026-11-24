@@ -279,7 +279,7 @@ export function animChar(c, dt, t) {
 }
 export function setPose(c, pose) {
   c.pose = pose;
-  if (pose === 'sit') { c.legs.forEach(l => { l.rotation.x = -Math.PI / 2; }); c.rig.position.y = 0; }
+  if (pose === 'sit') { c.legs.forEach(l => { l.rotation.x = -1.15; }); c.rig.position.y = 0; }
   else { c.legs.forEach(l => { l.rotation.x = 0; }); }
 }
 export function armsTo(c, l, r, dur = 0.3) { // l/r = [rx, rz]
@@ -630,12 +630,12 @@ const sparkTex = canvasTex(64, 64, (ctx) => {
   ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 64);
   ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(32, 0); ctx.lineTo(36, 28); ctx.lineTo(64, 32); ctx.lineTo(36, 36); ctx.lineTo(32, 64); ctx.lineTo(28, 36); ctx.lineTo(0, 32); ctx.lineTo(28, 28); ctx.fill();
 });
-export function sparkle(root, pos, n = 10, spread = 0.5, col = 0xffffff) {
+export function sparkle(root, pos, n = 10, spread = 0.5, col = 0xffffff, size = 1) {
   for (let i = 0; i < n; i++) {
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkTex, color: col, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     sp.position.copy(pos); root.add(sp);
     const dir = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.8 + 0.2, Math.random() - 0.5).normalize().multiplyScalar(spread * (0.5 + Math.random()));
-    const s0 = 0.12 + Math.random() * 0.15;
+    const s0 = (0.12 + Math.random() * 0.15) * size;
     tween(0.7 + Math.random() * 0.4, k => {
       sp.position.set(pos.x + dir.x * k, pos.y + dir.y * k, pos.z + dir.z * k);
       sp.scale.setScalar(s0 * (1 - k * 0.7)); sp.material.opacity = 1 - k; sp.material.rotation = k * 3;

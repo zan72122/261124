@@ -12,7 +12,8 @@ import {
 import { sfx, waterOn, waterOff, playMusic } from './sound.js';
 
 const params = new URLSearchParams(location.search);
-const G = { cast: null, girl: null, photo: null, held: null, busy: false };
+const G = { cast: null, girl: null, photo: null, held: null, busy: false, dbg: {} };
+window.__G = G; G.toScreen = toScreen; G.dbg.go = (i) => goScene(i);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const minDim = () => Math.min(window.innerWidth, window.innerHeight);
 
@@ -26,7 +27,7 @@ function makeCast() {
   return { girl, mama, papa, grandpa, neighbor };
 }
 function animate(list) { onUpdate((dt, t) => list.forEach(c => animChar(c, dt, t))); }
-function place(c, x, z, ry = 0, y = 0) { c.g.position.set(x, y, z); c.g.rotation.set(0, ry, 0); setPose(c, 'stand'); c.rig.position.set(0, 0, 0); c.arms[0].rotation.set(0, 0, -0.12); c.arms[1].rotation.set(0, 0, 0.12); c.anim = null; c.walking = 0; c.g.visible = true; c.g.scale.setScalar(1); }
+function place(c, x, z, ry = 0, y = 0) { c.g.position.set(x, y, z); c.g.rotation.set(0, ry, 0); setPose(c, 'stand'); c.rig.position.set(0, 0, 0); c.arms[0].rotation.set(0, 0, -0.12); c.arms[1].rotation.set(0, 0, 0.12); c.anim = null; c.walking = 0; c.g.visible = true; c.g.scale.setScalar(1); c.legs.forEach(l => { l.visible = true; }); }
 function girlReact(e, d = 1.4) { G.girl.setExpr(e, d); }
 
 // ---------- generic carry (drag or tap-then-tap) ----------
@@ -91,7 +92,7 @@ function hintUpdater(getList) {
       const s0 = o.userData.baseScale || (o.userData.baseScale = o.scale.clone());
       tween(0.5, k => { o.scale.copy(s0).multiplyScalar(1 + Math.sin(k * Math.PI) * 0.22); }, ease.linear);
       const p = new THREE.Vector3(); o.getWorldPosition(p); p.y += 0.15;
-      sparkle(current.scene.root, p, 5, 0.35);
+      sparkle(current.scene.root, p, 3, 0.3, 0xffffff, 0.5);
     }
   });
 }
@@ -216,8 +217,8 @@ function capturePortrait(root, girl) {
   portraitRT = new THREE.WebGLRenderTarget(512, 640, { samples: 4 });
   const cam = new THREE.PerspectiveCamera(24, 512 / 640, 0.1, 50);
   const h = girl.head.getWorldPosition(new THREE.Vector3());
-  cam.position.set(h.x + 0.25, h.y + 0.05, h.z + 1.6);
-  cam.lookAt(h.x, h.y - 0.12, h.z);
+  cam.position.set(h.x + 0.25, h.y + 0.1, h.z + 1.9);
+  cam.lookAt(h.x, h.y - 0.02, h.z);
   renderer.setRenderTarget(portraitRT);
   renderer.render(root, cam);
   renderer.setRenderTarget(null);
@@ -404,7 +405,7 @@ function sceneRestaurant() {
     await tween(0.35, k => { d.rotation.z = k * 1.5; d.position.x = s.spot.x + k * 0.12; d.position.y = s.spot.y + Math.sin(k * Math.PI) * 0.1; });
     sfx.splash();
     const col = d.userData.kind === 'soup' ? '#d9482a' : d.userData.kind === 'salad' ? '#7a9a2a' : '#8a3f12';
-    stain = mesh(new THREE.CircleGeometry(0.34, 32).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({
+    stain = mesh(new THREE.CircleGeometry(0.42, 32).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({
       map: canvasTex(128, 128, (cx) => { cx.fillStyle = col; for (let i = 0; i < 9; i++) { cx.beginPath(); cx.arc(64 + Math.cos(i * 1.9) * 28 * (i % 3 ? 1 : 0.4), 64 + Math.sin(i * 2.3) * 24, 18 + (i * 7) % 16, 0, 7); cx.fill(); } }),
       transparent: true, roughness: 0.2, polygonOffset: true, polygonOffsetFactor: -2, depthWrite: false,
     }), s.spot.x + 0.1, 0.772, s.spot.z + 0.05, false);
@@ -412,6 +413,7 @@ function sceneRestaurant() {
     tween(0.4, k => stain.scale.setScalar(Math.max(0.01, k)), ease.out);
     await armsTo(c, null, ARMS_DOWN[1], 0.2);
     c.setExpr('oops');
+    camTo(V(-1.7, 3.3, 6.2), V(-2.1, 0.8, 1.2), 5.4, 3.2, 1.2);
     C.mama.setExpr('surprised', 1.0);
     await wait(1.0);
     C.mama.setExpr('laugh', 1.6); sfx.giggle();
@@ -430,11 +432,11 @@ function sceneRestaurant() {
       G.held = null; sfx.swish(); girlReact('wow', 0.8);
       beginDrag({
         move(sx, sy) {
-          const p = rayPlaneY(sx, sy, 0.8); if (!p) return;
+          const p = rayPlaneY(sx, sy, 0.8); if (!p || !stain) return;
           const prev = cloth.position.clone();
           cloth.position.set(p.x, 0.8, p.z);
           const dist = Math.hypot(p.x - stain.position.x, p.z - stain.position.z);
-          if (dist < 0.5) {
+          if (dist < 0.8) {
             rubbing += prev.distanceTo(cloth.position);
             cloth.rotation.y = Math.sin(rubbing * 8) * 0.4;
             stain.material.opacity = Math.max(0, 1 - rubbing / 2.2);
@@ -443,13 +445,15 @@ function sceneRestaurant() {
             if (rubbing > 2.2) cleaned();
           }
         },
-        up() { if (stain) arc(cloth, clothHome, 0.2, 0.3); },
+        up() { if (stain && cloth) arc(cloth, clothHome, 0.2, 0.3); },
       });
     };
     clothTap = onTap(cloth, startWipe, () => !!stain);
     stainTap = onTap(stain, startWipe, () => !!stain);
   }
   let clothTap = null, stainTap = null;
+G.dbg.serveAll = () => { seats.forEach(s => { s.served = true; s.seated = true; }); checkAllServed(); }; G.dbg.bowls = () => toppings; G.dbg.cake = () => cake; G.dbg.phase = () => phase;
+    G.dbg.stain = () => stain; G.dbg.cloth = () => cloth; G.dbg.seats = seats; G.dbg.stations = stations;
   async function cleaned() {
     const st = stain; stain = null;
     root.remove(st); removeTap(clothTap); removeTap(stainTap);
@@ -458,6 +462,7 @@ function sceneRestaurant() {
     root.remove(s.dish); s.dish = null; s.eating = false;
     tween(0.3, k => cloth.scale.setScalar(Math.max(0.01, 1 - k))).then(() => root.remove(cloth));
     C.papa.setExpr('happy'); girlReact('happy', 2); cheer(G.girl, 0.8);
+    camTo(V(0, 5.0, 10.0), V(0, 0.9, 0.9), 9.4, 5.6, 1.2);
     sfx.yay();
     await wait(1.2);
     showBubble(s); // papa would like soup again, please!
@@ -486,7 +491,7 @@ function sceneRestaurant() {
     await wait(1.0);
     // clear the stations, bring the cake
     stations.forEach(st => { tween(0.4, k => st.g.scale.setScalar(Math.max(0.01, 1 - k))); if (st.dish) { root.remove(st.dish); st.dish = null; } });
-    camTo(V(0, 2.7, 6.3), V(0, 1.0, 3.4), 4.6, 2.5, 1.3);
+    camTo(V(0, 2.25, 5.4), V(0, 1.1, 3.45), 3.5, 2.0, 1.3);
     cake = new THREE.Group(); cake.position.set(0, CY, 3.45); root.add(cake);
     cake.add(mesh(new THREE.CylinderGeometry(0.06, 0.16, 0.12, 24), M.brass, 0, 0.06, 0));
     cake.add(mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.015, 40), M.brass, 0, 0.125, 0));
@@ -506,7 +511,7 @@ function sceneRestaurant() {
       for (let i = 0; i < 7; i++) {
         const it = toppingMesh(kd.k, i); it.position.set(Math.cos(i * 2.2) * 0.07 * (i ? 1 : 0), 0.09 + (i % 2) * 0.02, Math.sin(i * 2.2) * 0.07 * (i ? 1 : 0)); b.add(it);
       }
-      b.add(Object.assign(hitProxy(new THREE.CylinderGeometry(0.3, 0.3, 0.4, 12)), { position: V(0, 0.1, 0) }));
+      { const bh = hitProxy(new THREE.CylinderGeometry(0.3, 0.3, 0.4, 12)); bh.position.y = 0.1; b.add(bh); }
       b.scale.setScalar(0.01); tween(0.4, k => b.scale.setScalar(Math.max(0.01, k)), ease.back);
       onTap(b, () => addTopping(kd, b), () => phase === 'dessert');
       toppings.push(b);
@@ -518,14 +523,14 @@ function sceneRestaurant() {
     if (k === 'berry') { const m = mesh(new THREE.SphereGeometry(0.035, 12, 10), std(0xe8283a, 0.25)); m.scale.y = 1.3; return m; }
     if (k === 'blue') return mesh(new THREE.SphereGeometry(0.022, 12, 10), std(0x34408f, 0.3));
     const cols = [0xff6fa5, 0x6fd3ff, 0xffe066, 0x8cf07a];
-    const m = mesh(new THREE.CapsuleGeometry(0.006, 0.02, 3, 6), std(cols[i % 4], 0.5)); m.rotation.set(i, i * 1.3, 0); return m;
+    const m = mesh(new THREE.CapsuleGeometry(0.006, 0.02, 3, 6), std(cols[Math.floor(i) % 4], 0.5)); m.rotation.set(i, i * 1.3, 0); return m;
   }
   const slots = []; for (let i = 0; i < 8; i++) slots.push(V(Math.cos(i / 8 * Math.PI * 2) * 0.19, 0.35, Math.sin(i / 8 * Math.PI * 2) * 0.19)); slots.push(V(0, 0.36, 0));
   async function addTopping(kd, bowl) {
     if (!cake || phase !== 'dessert') return;
     girlReact('happy', 0.8);
     const n = kd.k === 'sprinkle' ? 6 : 1;
-    const target = slots[placed % slots.length].clone();
+    const target = slots[Math.floor(placed) % slots.length].clone();
     for (let j = 0; j < n; j++) {
       const t = toppingMesh(kd.k, j + placed);
       const from = bowl.position.clone().add(V(0, 0.15, 0));
@@ -686,6 +691,7 @@ function sceneHotel() {
   guests.forEach(gst => { root.add(gst.c.g); place(gst.c, -6.2, 1.3, Math.PI / 2); gst.c.g.visible = false; });
   animate([girl, ...guests.map(x => x.c)]);
   let idx = 0;
+  G.dbg.keys = keys; G.dbg.guest = () => guest; G.dbg.cart = cart;
 
   async function nextGuest() {
     if (idx >= guests.length) return;
@@ -874,6 +880,7 @@ function sceneBath() {
   animate([gp, girl]);
 
   let filled = false, soap = false, foamOn = false, done = false;
+  G.dbg.faucet = faucet; G.dbg.bottle = bottle; G.dbg.popped = () => poppedN;
   onTap(faucet, async () => {
     if (filled || faucet.userData.running) return;
     faucet.userData.running = true; girlReact('happy', 1);
@@ -908,6 +915,7 @@ function sceneBath() {
   const N = 260;
   const foam = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, emissive: 0xf4f8ff, emissiveIntensity: 0.25 }), N);
   foam.castShadow = true; foam.receiveShadow = true; foam.frustumCulled = false;
+  foam.boundingSphere = new THREE.Sphere(V(0.2, 1.0, -0.3), 2.5);
   const F = [];
   const dummy = new THREE.Object3D();
   for (let i = 0; i < N; i++) {
@@ -916,7 +924,8 @@ function sceneBath() {
     const layer = Math.random();
     const x = 0.2 + Math.cos(a) * rr * (0.85 + layer * 0.35) * 1.05;
     const z = -0.3 + Math.sin(a) * rr * (0.5 + layer * 0.25);
-    const top = 0.6 + (1 - rr) * 0.9 + Math.random() * 0.2;
+    const near = Math.hypot(x - 0.0, (z + 0.3) * 1.3) < 0.4;
+    const top = near ? 0.9 + Math.random() * 0.08 : 0.6 + (1 - rr) * 0.75 + Math.random() * 0.15;
     const y = 0.45 + layer * (top - 0.45);
     F.push({ p: V(x, y, z), s: 0, target: 0.13 + Math.random() * 0.1, delay: layer * 2.2 + Math.random() * 0.4, alive: true, pop: 0 });
   }
@@ -949,8 +958,8 @@ function sceneBath() {
     const from = gp.g.position.clone();
     const to = V(0.0, 0.2, -0.3);
     setPose(gp, 'sit');
-    await tween(0.6, k => { gp.g.position.lerpVectors(from, to, k); gp.g.position.y += Math.sin(k * Math.PI) * 0.6; gp.g.rotation.y = 0.4 + k * (1.57 - 0.4); });
-    gp.g.position.y = 0.3 - gp.legL + 0.05; gp.g.rotation.y = 1.0;
+    await tween(0.6, k => { gp.g.position.lerpVectors(from, to, k); gp.g.position.y += Math.sin(k * Math.PI) * 0.6; gp.g.rotation.y = 0.4 - k * 0.15; });
+    gp.g.position.y = 0.3 - gp.legL + 0.05; gp.g.rotation.y = 0.25; gp.legs.forEach(l => { l.visible = false; }); // legs are under the water
     sfx.splash(); sparkle(root, V(0.2, 0.7, -0.3), 12, 0.6, 0xbfe6ff);
     gp.setExpr('happy');
     await wait(0.6);
@@ -1102,6 +1111,7 @@ function sceneGarden() {
   const HEIGHTS = [0.3, 0.75, 1.3, 1.95, 2.7];
   const GRAV = 7.0;
   let on = null; // { j, y, vy, level, boost, spinning }
+  G.dbg.tramp = tramp; G.dbg.jumpers = jumpers; G.dbg.on = () => on; G.dbg.flyAll = () => jumpers.forEach(j => j.flown = true);
   let ceremony = false, free = false;
 
   function setOn(j) {
@@ -1210,10 +1220,10 @@ function sceneGarden() {
     if (on) { const o = on; on = null; await getOff(o.j); }
     sfx.ding();
     // everyone lines up by the wall
-    const spots = [[-5.2, -1.6], [-4.6, -1.0], [-2.6, -1.0], [-2.0, -1.6]];
-    camTo(V(-3.6, 2.2, 3.4), V(-3.6, 1.9, -2.9), 4.8, 3.0, 1.6);
+    const spots = [[-5.4, -1.7], [-4.7, -1.2], [-2.5, -1.2], [-1.8, -1.7]];
+    camTo(V(-3.6, 2.0, 4.4), V(-3.6, 1.7, -2.9), 5.8, 3.7, 1.6);
     await Promise.all(jumpers.map((j, i) => walkTo(j.c, spots[i][0], spots[i][1], 2.2, 0)));
-    await walkTo(girl, -3.6, -1.9, 2.0, 0);
+    await walkTo(girl, -3.6, -1.6, 2.0, 0);
     await wait(0.4);
     // snap! the photo appears in the frame
     sfx.shutter(); await fadeTo(0.9, 0.08); await fadeTo(0, 0.35);

@@ -47,6 +47,7 @@ export const ease = {
 };
 let tweens = [];
 let updaters = [];
+window.__tw = () => tweens.map(t => [+t.t.toFixed(2), t.dur]);
 export function tween(dur, fn, e = ease.inOut) {
   return new Promise(res => { tweens.push({ t: 0, dur: Math.max(0.0001, dur), fn, e, res }); });
 }
@@ -172,7 +173,7 @@ const DTMAX = parseFloat(new URLSearchParams(location.search).get('dtmax') || '0
 export let time = 0;
 export function startLoop() {
   renderer.setAnimationLoop(() => {
-    const dt = Math.min(clock.getDelta(), DTMAX);
+    const dt = Math.min(clock.getDelta(), DTMAX); window.__f = (window.__f || 0) + 1;
     time += dt;
     const list = tweens.slice();
     for (const tw of list) {

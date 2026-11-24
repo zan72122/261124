@@ -1,3 +1,4 @@
+window.addEventListener("unhandledrejection", (e) => console.error("unhandled:", e.reason && (e.reason.stack || e.reason)));
 import { startLoop, onFirstTouch } from './core.js';
 import { initMaterials } from './art.js';
 import { unlock, playMusic } from './sound.js';

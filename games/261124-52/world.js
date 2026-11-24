@@ -360,16 +360,16 @@ export function buildSky(scene) {
 export function island(size = 1, withStrip = false) {
   const g = new THREE.Group();
   const sandT = tex.sand.clone(); sandT.needsUpdate = true; sandT.repeat.set(6, 6);
-  const beach = new THREE.Mesh(new THREE.CylinderGeometry(9 * size, 11 * size, 1.4, 40), new THREE.MeshStandardMaterial({ map: sandT, roughness: 0.95 }));
+  const beach = new THREE.Mesh(new THREE.CylinderGeometry(9 * size, 11 * size, 1.4, 40), new THREE.MeshStandardMaterial({ map: sandT, roughness: 0.95, color: 0xcdb48a }));
   beach.position.y = -0.4; g.add(beach);
   const shallow = new THREE.Mesh(new THREE.CylinderGeometry(13 * size, 13 * size, 0.1, 40), new THREE.MeshStandardMaterial({ color: 0x5fd6d0, transparent: true, opacity: 0.55, roughness: 0.2 }));
   shallow.position.y = -0.05; g.add(shallow);
   const hill = new THREE.Mesh(new THREE.SphereGeometry(5 * size, 24, 16), new THREE.MeshStandardMaterial({ color: 0x4f9a3c, roughness: 0.9 }));
-  hill.scale.set(1, 0.5, 0.8); hill.position.set(-2 * size, 0.3, -2 * size); g.add(hill);
+  hill.scale.set(1, 0.5, 0.8); hill.position.set(-2 * size, 0.3, (withStrip ? -4 : -2) * size); g.add(hill);
   const trunkM = mat(0x8a6a44, { roughness: 0.9 }), leafM = new THREE.MeshStandardMaterial({ color: 0x3f9a3a, roughness: 0.8, side: THREE.DoubleSide });
   const n = Math.round(4 * size + 2);
   for (let i = 0; i < n; i++) {
-    const a = Math.random() * Math.PI * 2, r = (4 + Math.random() * 3.5) * size;
+    const a = withStrip ? Math.PI * (1.1 + Math.random() * 0.8) : Math.random() * Math.PI * 2, r = (4 + Math.random() * 3.5) * size;
     const p = new THREE.Group(); p.position.set(Math.cos(a) * r, 0.3, Math.sin(a) * r);
     const hgt = 3 + Math.random() * 2;
     for (let k = 0; k < 6; k++) { const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, hgt / 6 + 0.05, 8), trunkM); seg.position.set(k * k * 0.02, (k + 0.5) * hgt / 6, 0); seg.rotation.z = -k * 0.04; p.add(seg); }

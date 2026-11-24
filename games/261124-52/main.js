@@ -70,9 +70,10 @@ function applyCamera(t) {
   const aspect = innerWidth / innerHeight;
   const dir = cam.pos.clone().sub(cam.look); let d = dir.length(); dir.normalize();
   const need = (wd, hd, dd) => Math.max(2 * Math.atan(hd / 2 / dd), 2 * Math.atan(wd / 2 / (dd * aspect)));
-  let f = need(cam.w, cam.h, d);
+  const cw = aspect < 1 ? cam.w * 0.85 : cam.w;
+  let f = need(cw, cam.h, d);
   const MAX = THREE.MathUtils.degToRad(68);
-  if (f > MAX) { d = Math.max(cam.h / 2 / Math.tan(MAX / 2), cam.w / 2 / (aspect * Math.tan(MAX / 2))); f = MAX; }
+  if (f > MAX) { d = Math.max(cam.h / 2 / Math.tan(MAX / 2), cw / 2 / (aspect * Math.tan(MAX / 2))); f = MAX; }
   camera.fov = THREE.MathUtils.radToDeg(f); camera.aspect = aspect; camera.updateProjectionMatrix();
   camera.position.copy(cam.look).addScaledVector(dir, d);
   camera.position.x += Math.sin(t * 0.7) * 0.012 * d * 0.1; camera.position.y += Math.sin(t * 0.9) * 0.01 * d * 0.1;
@@ -764,12 +765,13 @@ async function scene3() {
   const wagon = W.makeWagon(); wagon.position.set(-0.02, 0.127, 0.27); wagon.rotation.y = 0; plane.body.add(wagon);
   pax.forEach(p => { p.root.rotation.y = 0.95; });
   cups.length = 0;
-  W.DRINKS.forEach((d, i) => { const c = W.makeCup(d.color); c.key = d.key; c.group.position.set(-0.19 + i * 0.125, 0.127 + 0.5, 0.27 + (i % 2 ? 0.06 : -0.04)); plane.body.add(c.group); c.home = c.group.position.clone(); cups.push(c); });
+  W.DRINKS.forEach((d, i) => { const c = W.makeCup(d.color); c.key = d.key; c.group.scale.setScalar(1.3); c.group.position.set(-0.19 + i * 0.125, 0.127 + 0.5, 0.27 + (i % 2 ? 0.06 : -0.04)); plane.body.add(c.group); c.home = c.group.position.clone(); cups.push(c); });
   const cabCam = v3(-0.55, 1.0, 3.25), cabLook = v3(-0.62, 0.78, -0.2);
   await shot(cabCam, cabLook, 3.5, 1.55, 0);
   setEngine(1.2);
   flight.speed = 22; flight.mode = 0; startFlight();
   await fade(false, 0.8);
+  busy = false;
   // 吹き出し
   const bubbles = pax.map((p, i) => {
     const d = W.DRINKS.find(x => x.key === DESIRE[i]);
@@ -847,7 +849,7 @@ async function scene3() {
   flight.setMode(3);
   const isl = flight.landing;
   isl.position.set(0, flight.seaY, 0); skyS.add(isl);
-  plane.group.position.set(-70, 0, -3.5); plane.group.rotation.set(0, 0, 0);
+  plane.group.position.set(-70, 0, 3.5); plane.group.rotation.set(0, 0, 0);
   flight.speed = 0;
   const chase = () => { cam.look.copy(plane.group.position).add(v3(1, 0.8, 0)); cam.pos.copy(plane.group.position).add(v3(-3.5, 2.2, 8.5)); };
   ticks.add(chase); chase();
@@ -896,8 +898,8 @@ function cloudBand() { return flight.mode === 0 ? [-10, 6] : [16, 45]; }
 function placeCloud(c, initial) {
   const [a, b] = cloudBand();
   c.userData.ty = a + Math.random() * (b - a);
-  let z; do { z = (Math.random() - 0.5) * 160; } while (Math.abs(z) < 4);
-  if (flight.mode === 0 && Math.random() < 0.5) { z = -6 - Math.random() * 25; c.userData.ty = -2.5 + Math.random() * 4; }
+  let z; do { z = (Math.random() - 0.5) * 160; } while (z > -7 && z < 16);
+  if (flight.mode === 0 && Math.random() < 0.5) { z = -9 - Math.random() * 25; c.userData.ty = -2.5 + Math.random() * 4; }
   c.position.set(initial ? -120 + Math.random() * 300 : 180 + Math.random() * 40, c.userData.ty, z);
 }
 function updateFlight(dt, t) {
@@ -948,7 +950,7 @@ async function freePlay() {
     const dx = plane.group.position.x;
     flight.landing.position.x -= dx; flight.clouds.forEach(c => c.position.x -= dx); flight.islands.forEach(s => s.position.x -= dx);
     plane.group.position.x = 0;
-    flight.mode = 2; flight.speed = 18; flying = true; freeFly = true; busy = false;
+    flight.mode = 2; flight.speed = 18; flying = true; freeFly = true; busy = false; targetAlt = plane.group.position.y;
     hint = () => ({ at: worldOf(plane.body).add(v3(0, 0.5, 0)), wiggle: true, delay: 6 });
   };
   addItem(plane.body, { tap: () => { if (!flying) takeOff(); else loop(); } });
@@ -974,9 +976,9 @@ async function freePlay() {
       P.rotation.z += (THREE.MathUtils.clamp(d * 0.12, -0.35, 0.35) - P.rotation.z) * Math.min(1, dt * 4);
     } else targetAlt = P.position.y;
     P.rotation.x = Math.sin(t * 0.8) * 0.05;
-    cam.look.lerp(P.position.clone().add(v3(3, 0.2, 0)), Math.min(1, dt * 3));
-    cam.pos.lerp(P.position.clone().multiply(v3(1, 0.6, 1)).add(v3(-3.2, 2.4, 9.5)), Math.min(1, dt * 2));
-    cam.w = 9; cam.h = 5;
+    cam.look.lerp(P.position.clone().add(v3(0.5, 1.0, 0)), Math.min(1, dt * 3));
+    cam.pos.lerp(P.position.clone().add(v3(-1.2, 2.3, 9.5)), Math.min(1, dt * 2));
+    cam.w = 9.5; cam.h = 4.6;
     aimSun(sunSky, P.position, v3(6, 14, 6));
     girl.look = camera.position;
     flight.landing.position.x -= flight.speed * dt;
@@ -1066,6 +1068,14 @@ async function run() {
   if (s <= 1) await scene1();
   if (s <= 2) await scene2();
   if (s <= 3) await scene3();
+  if (s >= 4) { // デバッグ：島から自由飛行
+    active = skyS; skyS.add(plane.group); startFlight(); flight.setMode(3); flight.speed = 0;
+    pax.forEach((p, i) => { p.sit(); plane.body.add(p.root); p.root.position.copy(plane.seats[i]); p.root.rotation.set(0, Math.PI / 2, 0); });
+    plane.body.add(girl.root); girl.sit(); girl.root.position.set(1.03, 0.01, 0); girl.root.rotation.set(0, Math.PI / 2, 0);
+    flight.landing.position.set(0, flight.seaY, 0); skyS.add(flight.landing);
+    plane.group.position.set(2, flight.seaY + 0.33, 3.5); propSlow = true;
+    await shot(plane.group.position.clone().add(v3(-2, 2.4, 9)), plane.group.position.clone().add(v3(0.5, 0.6, 0)), 7, 3, 0);
+  }
   await freePlay();
 }
 window.__dbg = { cups, scr: o => toScreen(o.isVector3 ? o : worldOf(o)), v3, girl, papa, pax, plane, sec, cam, flight, THREE, get items() { return items; }, set busy(b) { busy = b; } };

@@ -1,5 +1,5 @@
 // title — the curry plate filling the short side over a blurred copy of itself, a big play button.
-import { L, rnd, canvas2d } from '../engine.js';
+import { L, rnd, canvas2d, stageTransform } from '../engine.js';
 import { vignette } from '../sprite.js';
 import { img } from '../assets.js';
 import { fx, hint, drawButton } from '../fx.js';
@@ -28,6 +28,27 @@ function prepare() {
   x.fillStyle = g; x.fillRect(0, 0, N, N);
 }
 
+let BACK = null, backKey = '';
+function drawBack(ctx) {
+  const key = [L.W, L.H, L.dpr, L.ex0, L.ey0, L.ex1, L.ey1].join('|');
+  if (key !== backKey) {
+    if (!BACK) BACK = document.createElement('canvas');
+    BACK.width = Math.round(L.W * L.dpr); BACK.height = Math.round(L.H * L.dpr);
+    const c = BACK.getContext('2d');
+    stageTransform(c);
+    const w = L.ex1 - L.ex0, h = L.ey1 - L.ey0;
+    const k = Math.max(w, h) * 1.1;
+    c.imageSmoothingEnabled = true;
+    c.drawImage(BLUR, (L.ex0 + L.ex1) / 2 - k / 2, (L.ey0 + L.ey1) / 2 - k / 2, k, k);
+    c.fillStyle = 'rgba(25,12,4,0.45)'; c.fillRect(L.ex0, L.ey0, w, h);
+    backKey = key;
+  }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(BACK, 0, 0);
+  ctx.restore();
+}
+
 function plan() {
   const E = safe();
   const short = Math.min(E.w, E.h);
@@ -39,11 +60,18 @@ function plan() {
     plateD = Math.min(plateD, E.h - d - 2 * br - 4 * M);
     const group = d + M + plateD + M + 2 * br;
     const y0 = E.y0 + M + Math.max(0, (E.h - 2 * M - group) / 2);
-    bub = { girl: { x: E.x1 - M - d / 2, y: y0 + d / 2, d }, mama: { x: E.x0 + M + d / 2, y: y0 + d / 2, d } };
+    // the girl (stirring at her pot) is the one greeting the player: centred above the plate
+    bub = { girl: { x: E.cx, y: y0 + d / 2, d }, mama: { x: E.x0 + M + d / 2, y: y0 + d / 2, d } };
     cy = y0 + d + M + plateD / 2;
     by = cy + plateD / 2 + M + br;
   } else {
-    bub = frame({ w: plateD, h: plateD }, [], {}).bub;
+    bub = frame({ w: plateD, h: plateD }, [], { chef: true }).bub;
+    // landscape: the girl stands in the middle of the right-hand band, as big as it allows
+    const bw = (E.w - plateD) / 2;
+    if (bw > minBubble() + 2 * M) {
+      const d = Math.min(bw - 2 * M, E.h * 0.5, 480);
+      bub.girl = { x: E.x1 - bw / 2, y: E.cy - short * 0.03, d };
+    }
     cy = E.cy - short * 0.03;
     by = E.y1 - br - M * 1.5;
   }
@@ -63,6 +91,8 @@ export default function title() {
       phase('title');
       hint.set({ type: 'tap', x: () => P.bx, y: () => P.by, r: P.br, glow: false });
     },
+    // the screen-sized backdrop is only for the title: give its memory back (iOS caps canvas memory)
+    exit() { if (BACK) { BACK.width = BACK.height = 1; backKey = ''; } },
     update(dt) {
       t += dt; steamT -= dt;
       if (steamT <= 0) {
@@ -71,12 +101,8 @@ export default function title() {
       }
     },
     draw(ctx) {
-      const w = L.ex1 - L.ex0, h = L.ey1 - L.ey0;
-      // blurred, darkened backdrop (cover)
-      const k = Math.max(w, h) * 1.1;
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(BLUR, (L.ex0 + L.ex1) / 2 - k / 2, (L.ey0 + L.ey1) / 2 - k / 2, k, k);
-      ctx.fillStyle = 'rgba(25,12,4,0.45)'; ctx.fillRect(L.ex0, L.ey0, w, h);
+      // blurred, darkened backdrop (cover): static, composed once per screen size
+      drawBack(ctx);
       // sharp plate, gentle drift (never more than a few % of the plate)
       const z = 1 + Math.sin(t * 0.12) * 0.015;
       const S = P.S * z, dx = Math.sin(t * 0.09) * P.plateD * 0.012, dy = Math.cos(t * 0.07) * P.plateD * 0.01;

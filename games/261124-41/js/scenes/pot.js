@@ -4,6 +4,7 @@ import { spr } from '../sprite.js';
 import { size, geo } from '../assets.js';
 import { fx, hint } from '../fx.js';
 import { bubbles } from '../bubbles.js';
+import { chef } from '../chef.js';
 import { snd } from '../snd.js';
 import { game, phase, wait, anim } from '../game.js';
 import { L as LAY } from '../engine.js';
@@ -78,6 +79,9 @@ export default function pot() {
     hint.progress();
     hint.clear();
     snd.sfx('whoosh', { vol: 0.5 });
+    // the girl drops the same vegetable into her pot: its splash frame lands together with the first
+    // piece in the overhead pot (0.2 s lean + 0.5 s flight)
+    chef.play(d.kind === 'meat' ? 'smile' : d.kind, { landIn: 0.7, onLand: () => { bubbles.hearts('girl', 1, 0.7); bubbles.girl.squash(0.5); } });
     // dish leans toward the pot
     const x0 = d.x, y0 = d.y;
     const tx = lerp(d.x, POT.x, 0.3), ty = lerp(d.y, POT.y, 0.3);
@@ -191,6 +195,7 @@ export default function pot() {
     step = 'simmer';
     phase('simmer');
     simmerTimer = 5;
+    chef.setSpeed(0.6);
     rattleT = 1.2;
     L('simmer').set(0.2, 1);
     anim(5, (k) => { pv.warm = k; pv.simmer = k; L('simmer').set(0.2 + 0.6 * k, 0.3); }, ease.linear);
@@ -208,6 +213,7 @@ export default function pot() {
   async function lift() {
     step = 'lifting';
     hint.clear();
+    chef.setSpeed(1);
     game.block = true;
     phase('lid-lift');
     const l = pv.lid;
@@ -261,6 +267,7 @@ export default function pot() {
       if (step === 'water') {
         if (pouring) {
           pourT += dt;
+          chef.setSpeed(jug.tilt ? 1.5 : 1);
           pourMin -= dt;
           if (jug.tilt) {
             pv.water = Math.min(1, pv.water + dt / 3);

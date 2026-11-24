@@ -3,24 +3,36 @@ import { L, layout, stageTransform, initInput, clamp, TAU, unitsToCss, getQualit
 import { loadAssets, sceneReady, whenSceneReady, sceneProgress, afterAll } from './assets.js';
 import { fx, hint, drawIris } from './fx.js';
 import { bubbles } from './bubbles.js';
+import { chef, IDLE } from './chef.js';
 import { snd } from './snd.js';
 import { game } from './game.js';
 import { layoutKey } from './layout.js';
 import { drawVectorCarrot } from './shapes.js';
 
+// Only the title is part of the first download; every other scene's code is fetched in the background
+// right after the title is on screen (in play order), and a scene is entered only once its code is in.
 import title from './scenes/title.js';
-import home from './scenes/home.js';
-import wash from './scenes/wash.js';
-import cut from './scenes/cut.js';
-import stamp from './scenes/stamp.js';
-import pot from './scenes/pot.js';
-import roux from './scenes/roux.js';
-import serve from './scenes/serve.js';
-import eat from './scenes/eat.js';
-import end from './scenes/end.js';
 
-const SCENES = { title, home, wash, cut, stamp, pot, roux, serve, eat, end };
-const ORDER = Object.keys(SCENES);
+const LOADERS = {
+  home: () => import('./scenes/home.js'), wash: () => import('./scenes/wash.js'), cut: () => import('./scenes/cut.js'),
+  stamp: () => import('./scenes/stamp.js'), pot: () => import('./scenes/pot.js'), roux: () => import('./scenes/roux.js'),
+  serve: () => import('./scenes/serve.js'), eat: () => import('./scenes/eat.js'), end: () => import('./scenes/end.js'),
+};
+const ORDER = ['title', ...Object.keys(LOADERS)];
+const SCENES = { title };
+const codeP = { title: Promise.resolve(title) };
+function loadScene(id) {
+  if (!codeP[id]) {
+    codeP[id] = LOADERS[id]().then((m) => { SCENES[id] = m.default; return m.default; })
+      .catch((e) => { delete codeP[id]; throw e; });   // a flaky network: try again on the next visit
+  }
+  return codeP[id];
+}
+// all small: asked for together, in play order
+function loadAllScenes() { for (const id of ORDER) loadScene(id).catch(() => {}); }
+const ready = (id) => !!SCENES[id] && sceneReady(id);
+const whenReady = (id) => Promise.all([loadScene(id), whenSceneReady(id)]);
+const CHEF_SCENES = { title: IDLE.pot, pot: IDLE.pot, roux: IDLE.curry };
 
 const canvas = document.getElementById('c');
 // opaque canvas: the compositor never has to blend it with the page
@@ -30,10 +42,11 @@ let trans = null; // { k, dir, id, opts }
 let downDelivered = false;
 let bgmStarted = false;
 
-const debug = { get scene() { return game.id; }, get phase() { return game.phase; }, goto: (id) => whenSceneReady(id).then(() => go(id, { fade: false })), ready: false, toCss: unitsToCss,
+const debug = { get scene() { return game.id; }, get phase() { return game.phase; }, goto: (id) => whenReady(id).then(() => go(id, { fade: false })), ready: false, toCss: unitsToCss,
   // for automated play-throughs: where the hint currently points
   hint: () => { const s = hint.spec; return s ? { type: s.type, x: hint.pos(s.x), y: hint.pos(s.y), x2: s.x2 != null ? hint.pos(s.x2) : null, y2: s.y2 != null ? hint.pos(s.y2) : null, r: s.r || 80 } : null; },
-  get block() { return game.block; } };
+  get block() { return game.block; }, get chef() { return Object.assign(chef.state(), { on: bubbles.girl.chefMode, shown: bubbles.girl.ca }); },
+  girl: () => { const q = bubbles.girl.pos(); return { x: q.x, y: q.y, d: q.d }; } };
 window.__game = debug;
 
 if (game.params.get('mute') === '1') snd.setMuted(true);
@@ -83,8 +96,19 @@ function checkRelayout() {
 }
 
 function go(id, opts = {}) {
-  if (!SCENES[id]) return;
-  if (opts.fade === false) { switchTo(id, opts); return; }
+  if (!ORDER.includes(id)) return;
+  loadScene(id).catch(() => {});
+  if (opts.fade === false) {
+    // a seamless hand-over (pot -> roux ...): its code and pictures are normally long in by then;
+    // if not, the current scene simply keeps going until they are (or falls back to the iris and its loader)
+    if (ready(id)) { switchTo(id, opts); return; }
+    if (opts.queued) return;
+    opts.queued = true;
+    const from = game.id;
+    whenReady(id).then(() => { if (game.id === from && !trans) switchTo(id, opts); },
+      () => { if (game.id === from) go(id, Object.assign({}, opts, { fade: true })); });
+    return;
+  }
   if (trans) return;
   trans = { k: 0, dir: 1, id, opts };
 }
@@ -99,9 +123,13 @@ function switchTo(id, opts) {
   game.block = false;
   game.phase = id;
   game.id = id;
+  const wasChef = bubbles.girl.chefMode;
   game.scene = SCENES[id](opts.carry || game.carry || null);
   game.carry = null;
+  // a fresh stirring pose, unless she just stays at the stove (pot -> roux)
+  if (CHEF_SCENES[id] && !(wasChef && id === 'roux')) chef.reset(CHEF_SCENES[id]);
   if (game.scene.enter) game.scene.enter();
+  bubbles.girl.useChef(!!CHEF_SCENES[id]);
 }
 
 initInput(canvas, {
@@ -110,6 +138,13 @@ initInput(canvas, {
     snd.sfx('tap', { vol: 0.35 });
     hint.touch();
     downDelivered = !!(loaded && !trans && !game.block && game.scene);
+    // touching the girl makes her giggle (never a target of the play itself)
+    if (loaded && !trans && bubbles.girl.chefMode && bubbles.girl.ca > 0.5 && bubbles.girl.hit(p) && !/cutscene/.test(game.phase)) {
+      downDelivered = false;
+      bubbles.girl.squash(0.6);
+      if (!chef.busy()) { chef.play('smile'); snd.sfx('girl', { mood: 'happy' }); bubbles.hearts('girl', 1, 0.8); }
+      return;
+    }
     if (downDelivered && game.scene.down) game.scene.down(p);
   },
   move(p) { if (downDelivered && !trans && game.scene && game.scene.move) game.scene.move(p); },
@@ -161,8 +196,12 @@ function update(dt) {
     if (trans.dir > 0 && trans.k >= 1) {
       trans.k = 1;
       // the next scene's pictures are still streaming in: stay behind the closed iris with the loader
-      if (!sceneReady(trans.id)) { trans.wait = (trans.wait || 0) + dt; loadK = sceneProgress(trans.id); }
-      else { trans.wait = 0; trans.dir = -1; switchTo(trans.id, trans.opts); }
+      if (!ready(trans.id)) {
+        // its code failed to arrive (flaky network): ask again about once a second
+        trans.retry = (trans.retry || 0) + dt;
+        if (!codeP[trans.id] && trans.retry > 1) { trans.retry = 0; loadScene(trans.id).catch(() => {}); }
+        trans.wait = (trans.wait || 0) + dt; loadK = sceneProgress(trans.id);
+      } else { trans.wait = 0; trans.dir = -1; switchTo(trans.id, trans.opts); }
     }
     else if (trans.dir < 0 && trans.k <= 0) trans = null;
   }
@@ -239,11 +278,12 @@ afterAll(() => {
 loadAssets((k) => { loadK = k; }).then(() => {
   const want = game.params.get('scene');
   const first = want && ORDER.includes(want) ? want : 'title';
-  return whenSceneReady(first).then(() => first);
+  return whenReady(first).then(() => first);
 }).then((first) => {
   loaded = true;
   layKey = layoutKey();
   switchTo(first, {});
   trans = { k: 1, dir: -1, id: first, opts: {} };
   debug.ready = true;
+  loadAllScenes();
 }).catch((e) => { console.error(e); });

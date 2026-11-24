@@ -156,8 +156,8 @@
   },
   {
    "file": "hero_curry.webp",
-   "w": 1280,
-   "h": 1280,
+   "w": 900,
+   "h": 900,
    "alpha": false,
    "note": "image shrunk so plate is ~62% width; border extended with blurred mirror (depth-of-field look); no flower carrots, has parsley"
   },

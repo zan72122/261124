@@ -76,14 +76,23 @@ function hanamaruPts(R) {
   return pts;
 }
 
+// crayon grain: the same random speckle every time (built once, not on every visit to the scene)
+let GRAIN = null;
 function grain() {
+  if (GRAIN) return GRAIN;
   const c = canvas2d(HS, HS), x = c.getContext('2d');
   for (let i = 0; i < 2600; i++) {
     x.fillStyle = `rgba(0,0,0,${rnd.range(0.25, 0.85)})`;
     x.beginPath(); x.ellipse(rnd() * HS, rnd() * HS, rnd.range(0.6, 2.2), rnd.range(0.4, 1.2), rnd() * TAU, 0, TAU); x.fill();
   }
-  return c;
+  return (GRAIN = c);
 }
+
+// the three crayon strokes, each drawn opaque into its own layer and only extended by the new
+// segments each frame; the visible mark = layers at their alpha, minus the grain
+const STROKES = [[16, 'rgb(214,32,38)', 0.92, 0, 0], [7, 'rgb(240,70,60)', 0.6, -2.5, -2], [5, 'rgb(160,15,25)', 0.45, 3, 3]];
+let LAYERS = null;
+function layers() { return LAYERS || (LAYERS = STROKES.map(() => canvas2d(HS, HS))); }
 
 export default function end(carry) {
   let t = 0, fanT = -1, steamT = 0;
@@ -96,23 +105,32 @@ export default function end(carry) {
   let hk = 0, drawnK = -1;
   let replay = 0, replayOn = false;
 
+  const LY = layers();
+  for (const c of LY) c.getContext('2d').clearRect(0, 0, HS, HS);
+  let drawnN = 1;
   function renderHanamaru() {
     if (drawnK === hk) return;
     drawnK = hk;
-    const x = H.getContext('2d');
-    x.clearRect(0, 0, HS, HS);
     const s = HS / (EXT * 2);
     const n = Math.max(2, Math.floor(pts.length * hk));
-    x.save();
-    x.translate(HS / 2, HS / 2); x.scale(s, s);
-    x.lineCap = 'round'; x.lineJoin = 'round';
-    for (const [w, col, ox, oy] of [[16, 'rgba(214,32,38,0.92)', 0, 0], [7, 'rgba(240,70,60,0.6)', -2.5, -2], [5, 'rgba(160,15,25,0.45)', 3, 3]]) {
-      x.strokeStyle = col; x.lineWidth = w;
-      x.beginPath(); x.moveTo(pts[0][0] + ox, pts[0][1] + oy);
-      for (let i = 1; i < n; i++) x.lineTo(pts[i][0] + ox, pts[i][1] + oy);
-      x.stroke();
+    if (n > drawnN) {
+      STROKES.forEach(([w, col, , ox, oy], i) => {
+        const x = LY[i].getContext('2d');
+        x.save();
+        x.translate(HS / 2, HS / 2); x.scale(s, s);
+        x.lineCap = 'round'; x.lineJoin = 'round';
+        x.strokeStyle = col; x.lineWidth = w;
+        x.beginPath(); x.moveTo(pts[drawnN - 1][0] + ox, pts[drawnN - 1][1] + oy);
+        for (let j = drawnN; j < n; j++) x.lineTo(pts[j][0] + ox, pts[j][1] + oy);
+        x.stroke();
+        x.restore();
+      });
+      drawnN = n;
     }
-    x.restore();
+    const x = H.getContext('2d');
+    x.clearRect(0, 0, HS, HS);
+    STROKES.forEach(([, , a], i) => { x.globalAlpha = a; x.drawImage(LY[i], 0, 0); });
+    x.globalAlpha = 1;
     x.globalCompositeOperation = 'destination-out';
     x.drawImage(G, 0, 0);
     x.globalCompositeOperation = 'source-over';

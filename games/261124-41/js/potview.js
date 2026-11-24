@@ -1,0 +1,340 @@
+// potview.js — the stove + pot seen from above, shared by the pot and roux scenes:
+// flames, pieces lying in the pot, water, golden broth, the curry "mix" transformation, the lid.
+import { TAU, rnd, clamp, lerp, Spring, canvas2d, ease } from './engine.js';
+import { spr, drawBg, vignette, tint } from './sprite.js';
+import { img, size, geo } from './assets.js';
+import { softBlob } from './fx.js';
+
+export const POT = { x: 500, y: 415, outerR: 280 };
+
+export function potGeom() {
+  const o = geo('pot', 'outer', { cx: 0.5, cy: 0.5, r: 0.38 });
+  const i = geo('pot', 'inner', { cx: 0.5, cy: 0.5, r: 0.335 });
+  const w = (POT.outerR) / o.r;
+  const s = size('pot');
+  const h = w * s.h / s.w;
+  const x = POT.x - (o.cx - 0.5) * w, y = POT.y - (o.cy - 0.5) * h; // sprite centre so that outer circle is at POT
+  return { w, x, y, ix: x + (i.cx - 0.5) * w, iy: y + (i.cy - 0.5) * h, ir: i.r * w, or: POT.outerR };
+}
+
+export function createPot() {
+  const g = potGeom();
+  return {
+    g, t: 0,
+    pieces: [],           // { name, cooked, x, y, rot, w, cook, float, sq, bob }
+    flame: 0, water: 0, broth: 0, warm: 0, simmer: 0, soft: 0,
+    lid: null,            // { x, y, h, alpha, rot, sq, jit }
+    ripples: [], pops: [],
+    mix: null,            // curry transformation state (roux scene)
+    update(dt) {
+      this.t += dt;
+      for (const p of this.pieces) if (p.sq) p.sq.update(dt);
+      if (this.lid && this.lid.sq) this.lid.sq.update(dt);
+      for (let i = this.ripples.length - 1; i >= 0; i--) { const r = this.ripples[i]; r.age += dt; if (r.age > r.life) this.ripples.splice(i, 1); }
+      // bubbles popping at the surface while simmering
+      if (this.broth > 0.2 || this.simmer > 0.2) {
+        const rate = (this.mix ? 3 + this.mix.mean * 3 : 7) * Math.max(this.broth, this.simmer);
+        if (rnd() < rate * dt) {
+          const a = rnd() * TAU, d = Math.sqrt(rnd()) * this.g.ir * 0.85;
+          this.pops.push({ x: this.g.ix + Math.cos(a) * d, y: this.g.iy + Math.sin(a) * d, age: 0, life: rnd.range(0.5, 1.1), s: rnd.range(5, 13) });
+        }
+      }
+      for (let i = this.pops.length - 1; i >= 0; i--) { const p = this.pops[i]; p.age += dt; if (p.age > p.life) this.pops.splice(i, 1); }
+    },
+    ripple(x, y, big = 1, life = 1) { this.ripples.push({ x, y, big, age: 0, life }); },
+  };
+}
+
+// standard full set of pieces (for starting a later scene directly)
+export function fillPot(pv, cooked = true) {
+  const spots = potSpots(pv, 26);
+  const add = (name, w, extra = {}) => {
+    const s = spots.shift();
+    pv.pieces.push(Object.assign({ name, x: s.x, y: s.y, rot: rnd() * TAU, w, cook: cooked ? 1 : 0, float: false, sq: new Spring(260, 10), bob: rnd() * TAU }, extra));
+  };
+  for (let i = 0; i < 5; i++) add('meat_raw_' + (1 + (i % 3)), 74, { cooked: 'meat_cooked_' + (1 + (i % 3)) });
+  for (let i = 0; i < 5; i++) add('onion_wedge_' + (1 + (i % 4)), 76);
+  for (let i = 0; i < 5; i++) add('potato_chunk_' + (1 + (i % 4)), 78);
+  for (let i = 0; i < 2; i++) add('carrot_slice_' + (1 + i), 64);
+  for (const k of ['flower', 'star', 'flower', 'heart', 'flower']) add('carrot_' + k, 70, { float: true });
+}
+
+// well-spread landing spots inside the pot (golden-angle spiral with jitter)
+export function potSpots(pv, n) {
+  const out = [];
+  const off = rnd() * TAU;
+  for (let i = 0; i < n; i++) {
+    const r = Math.sqrt((i + 0.5) / n) * pv.g.ir * 0.74;
+    const a = off + i * 2.39996;
+    out.push({ x: pv.g.ix + Math.cos(a) * r + rnd.range(-8, 8), y: pv.g.iy + Math.sin(a) * r + rnd.range(-8, 8) });
+  }
+  for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+  return out;
+}
+
+export function drawStove(ctx, pv) {
+  const b = geo('bg_stove', 'burner', { cx: 0.5, cy: 0.5, r: 0.2 });
+  const S = clamp((POT.outerR * 1.02) / b.r, 1300, 2200);
+  drawBg(ctx, 'bg_stove', POT.x - (b.cx - 0.5) * S, POT.y - (b.cy - 0.5) * S, S);
+  if (pv.warm > 0) tint(ctx, `rgba(255,150,60,${0.1 * pv.warm})`, 'soft-light');
+  vignette(ctx, 0.45, POT.x, POT.y);
+  drawFlames(ctx, pv);
+}
+
+function drawFlames(ctx, pv) {
+  if (pv.flame <= 0.01) return;
+  const t = pv.t, R = POT.outerR, f = pv.flame;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const glow = ctx.createRadialGradient(POT.x, POT.y, R * 0.9, POT.x, POT.y, R * 1.35);
+  glow.addColorStop(0, `rgba(60,120,255,${0.35 * f})`); glow.addColorStop(1, 'rgba(40,80,255,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(POT.x, POT.y, R * 1.35, 0, TAU); ctx.fill();
+  const N = 28;
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * TAU + 0.05 * Math.sin(t * 3 + i);
+    const L = f * (24 + 9 * Math.sin(t * 17 + i * 2.3) + 6 * Math.sin(t * 29 + i * 5.1));
+    const r0 = R - 10;
+    const bx = POT.x + Math.cos(a) * r0, by = POT.y + Math.sin(a) * r0;
+    const tx = POT.x + Math.cos(a) * (r0 + L + 10), ty = POT.y + Math.sin(a) * (r0 + L + 10);
+    const gr = ctx.createLinearGradient(bx, by, tx, ty);
+    gr.addColorStop(0, 'rgba(120,180,255,0.95)'); gr.addColorStop(0.45, 'rgba(60,110,255,0.6)'); gr.addColorStop(1, 'rgba(40,60,255,0)');
+    ctx.fillStyle = gr;
+    const nx = -Math.sin(a) * 9, ny = Math.cos(a) * 9;
+    ctx.beginPath();
+    ctx.moveTo(bx + nx, by + ny);
+    ctx.quadraticCurveTo(bx + nx + (tx - bx) * 0.5, by + ny + (ty - by) * 0.5, tx, ty);
+    ctx.quadraticCurveTo(bx - nx + (tx - bx) * 0.5, by - ny + (ty - by) * 0.5, bx - nx, by - ny);
+    ctx.closePath(); ctx.fill();
+    // white-violet core
+    ctx.fillStyle = 'rgba(200,220,255,0.35)';
+    ctx.beginPath(); ctx.arc(bx + (tx - bx) * 0.2, by + (ty - by) * 0.2, 4, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawPiece(ctx, pv, p) {
+  const q = p.sq ? p.sq.x * 0.05 : 0;
+  let x = p.x, y = p.y, rot = p.rot;
+  const liquid = Math.max(pv.water, pv.broth);
+  if (liquid > 0.3) { x += Math.sin(pv.t * 1.6 + p.bob) * 3 * liquid; y += Math.cos(pv.t * 1.3 + p.bob) * 3 * liquid; rot += Math.sin(pv.t + p.bob) * 0.04 * liquid; }
+  if (pv.jiggle) { x += Math.sin(pv.t * 40 + p.bob * 7) * 1.6 * pv.jiggle; y += Math.cos(pv.t * 37 + p.bob * 5) * 1.6 * pv.jiggle; }
+  const o = { rot, sx: 1 + q, sy: 1 - q, sa: 0.8, h: p.h || 0 };
+  const cook = p.cooked ? p.cook : 0;
+  if (cook < 1) spr(ctx, p.name, x, y, p.w, o);
+  if (cook > 0) spr(ctx, p.cooked, x, y, p.w, Object.assign({}, o, { alpha: cook, shadow: cook >= 1 }));
+}
+
+function clipInner(ctx, g) { ctx.beginPath(); ctx.arc(g.ix, g.iy, g.ir, 0, TAU); ctx.clip(); }
+
+export function drawPot(ctx, pv) {
+  const g = pv.g;
+  spr(ctx, 'pot', g.x, g.y, g.w, { sa: 1.1 });
+  ctx.save();
+  clipInner(ctx, g);
+  for (const p of pv.pieces) if (!p.float && p.inPot !== false) drawPiece(ctx, pv, p);
+  if (pv.water > 0) drawWater(ctx, pv);
+  if (pv.broth > 0) drawBroth(ctx, pv);
+  if (pv.mix) drawMix(ctx, pv);
+  for (const p of pv.pieces) if (p.float && p.inPot !== false) drawPiece(ctx, pv, p);
+  drawSurface(ctx, pv);
+  // the pot wall darkens toward the rim
+  const sh = ctx.createRadialGradient(g.ix - g.ir * 0.1, g.iy - g.ir * 0.12, g.ir * 0.7, g.ix, g.iy, g.ir);
+  sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(10,5,0,0.28)');
+  ctx.fillStyle = sh; ctx.fillRect(g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
+  ctx.restore();
+  if (pv.lid && pv.lid.alpha > 0) drawLid(ctx, pv);
+}
+
+function drawWater(ctx, pv) {
+  const g = pv.g, w = pv.water;
+  ctx.fillStyle = `rgba(200,222,235,${0.42 * w})`;
+  ctx.fillRect(g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
+  caustics(ctx, pv, 0.1 * w * (1 - pv.broth));
+}
+
+function caustics(ctx, pv, a) {
+  if (a <= 0.005) return;
+  const g = pv.g, t = pv.t, blob = softBlob();
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 8; i++) {
+    const an = t * (0.2 + i * 0.04) + i * 2.3;
+    const rr = g.ir * (0.2 + 0.55 * ((i * 0.41) % 1));
+    const x = g.ix + Math.cos(an) * rr, y = g.iy + Math.sin(an * 1.2) * rr * 0.85;
+    const s = g.ir * 0.3;
+    ctx.globalAlpha = a * (0.7 + 0.3 * Math.sin(t * 1.7 + i));
+    ctx.save(); ctx.translate(x, y); ctx.rotate(an); ctx.scale(1.9, 0.45);
+    ctx.drawImage(blob, -s, -s, s * 2, s * 2);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawBroth(ctx, pv) {
+  const g = pv.g, b = pv.broth;
+  ctx.save();
+  ctx.fillStyle = `rgba(214,150,52,${0.5 * b})`;
+  ctx.fillRect(g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
+  ctx.globalCompositeOperation = 'screen';
+  const hl = ctx.createRadialGradient(g.ix - g.ir * 0.35, g.iy - g.ir * 0.4, 0, g.ix - g.ir * 0.35, g.iy - g.ir * 0.4, g.ir * 0.9);
+  hl.addColorStop(0, `rgba(255,220,140,${0.28 * b})`); hl.addColorStop(1, 'rgba(255,220,140,0)');
+  ctx.fillStyle = hl; ctx.fillRect(g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
+  ctx.restore();
+  caustics(ctx, pv, 0.07 * b);
+}
+
+function drawSurface(ctx, pv) {
+  const liquid = Math.max(pv.water, pv.broth, pv.mix ? 1 : 0);
+  if (liquid <= 0) return;
+  ctx.save();
+  for (const r of pv.ripples) {
+    const k = r.age / r.life;
+    ctx.strokeStyle = `rgba(255,255,255,${0.5 * (1 - k) * Math.min(1, r.big)})`;
+    ctx.lineWidth = 3 * (1 - k) + 1;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 10 + ease.outCubic(k) * 110 * r.big, 0, TAU); ctx.stroke();
+  }
+  const thick = pv.mix ? pv.mix.mean : 0;
+  for (const p of pv.pops) {
+    const k = p.age / p.life;
+    const s = p.s * (0.5 + k * 0.7);
+    if (k < 0.85) {
+      ctx.fillStyle = thick > 0.5 ? `rgba(120,60,15,${0.35})` : `rgba(255,240,200,${0.25})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, s, 0, TAU); ctx.fill();
+      ctx.strokeStyle = `rgba(255,250,230,${0.55 * (1 - k)})`; ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.beginPath(); ctx.arc(p.x - s * 0.35, p.y - s * 0.35, s * 0.25, 0, TAU); ctx.fill();
+    } else {
+      const kk = (k - 0.85) / 0.15;
+      ctx.strokeStyle = `rgba(255,250,230,${0.6 * (1 - kk)})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, s * (1 + kk * 1.5), 0, TAU); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawLid(ctx, pv) {
+  const l = pv.lid, g = pv.g;
+  const lg = geo('lid', 'lid', geo('lid', 'circle', { cx: 0.5, cy: 0.5, r: 0.49 }));
+  const r = l.r || g.ir * 1.13;
+  const w = r / (lg.r || 0.49);
+  const q = l.sq ? l.sq.x * 0.04 : 0;
+  spr(ctx, 'lid', l.x + (l.jx || 0), l.y + (l.jy || 0), w * (l.sc || 1), { h: l.h, alpha: l.alpha, rot: l.rot || 0, sx: 1 + q, sy: 1 - q });
+}
+
+// ---------------------------------------------------------------- curry transformation
+const MS = 256, CS = 512;
+export function initMix(pv) {
+  const M = canvas2d(MS, MS), T = canvas2d(MS, MS), C = canvas2d(CS, CS), S = canvas2d(16, 16);
+  pv.mix = { M, T, C, S, sx: S.getContext('2d', { willReadFrequently: true }), mean: 0, base: 0, pending: 0, texAng: 0, done: false };
+}
+// stage coords -> mask pixel coords
+function toM(pv, x, y) { const g = pv.g; return { x: ((x - g.ix) / (g.ir * 2) + 0.5) * MS, y: ((y - g.iy) / (g.ir * 2) + 0.5) * MS }; }
+
+export function mixRotate(pv, ang, cx, cy, ringR, ringW, ringAng) {
+  const m = pv.mix, mx = m.M.getContext('2d'), tx = m.T.getContext('2d');
+  tx.clearRect(0, 0, MS, MS);
+  tx.drawImage(m.M, 0, 0);
+  mx.save();
+  mx.clearRect(0, 0, MS, MS);
+  mx.translate(MS / 2, MS / 2); mx.rotate(ang); mx.translate(-MS / 2, -MS / 2);
+  mx.drawImage(m.T, 0, 0);
+  mx.restore();
+  if (ringAng) {
+    // extra rotation in the ring the spatula moves through -> shear -> swirls
+    tx.clearRect(0, 0, MS, MS);
+    tx.drawImage(m.M, 0, 0);
+    const r = (ringR / (pv.g.ir * 2)) * MS, w = (ringW / (pv.g.ir * 2)) * MS;
+    mx.save();
+    mx.beginPath(); mx.arc(MS / 2, MS / 2, r + w, 0, TAU); mx.arc(MS / 2, MS / 2, Math.max(1, r - w), 0, TAU, true); mx.clip();
+    mx.clearRect(0, 0, MS, MS);
+    mx.translate(MS / 2, MS / 2); mx.rotate(ringAng); mx.translate(-MS / 2, -MS / 2);
+    mx.drawImage(m.T, 0, 0);
+    mx.restore();
+  }
+  void cx; void cy;
+}
+
+export function mixDeposit(pv, x, y, r, a) {
+  const m = pv.mix, mx = m.M.getContext('2d');
+  const p = toM(pv, x, y), rr = (r / (pv.g.ir * 2)) * MS;
+  mx.globalAlpha = clamp(a, 0, 1);
+  mx.drawImage(softBlob(), p.x - rr, p.y - rr, rr * 2, rr * 2);
+  mx.globalAlpha = 1;
+}
+
+// uniform rise, applied additively in chunks big enough to survive 8-bit rounding
+export function mixRaise(pv, amount) {
+  const m = pv.mix;
+  m.pending += amount; m.base += amount;
+  if (m.pending < 4 / 255) return;
+  const mx = m.M.getContext('2d');
+  mx.save();
+  mx.globalCompositeOperation = 'lighter';
+  mx.fillStyle = `rgba(255,255,255,${m.pending})`;
+  mx.fillRect(0, 0, MS, MS);
+  mx.restore();
+  m.pending = 0;
+}
+
+export function mixFill(pv) {
+  const mx = pv.mix.M.getContext('2d');
+  mx.fillStyle = '#fff'; mx.fillRect(0, 0, MS, MS);
+  pv.mix.mean = 1;
+}
+
+export function mixMeasure(pv) {
+  const m = pv.mix;
+  m.sx.clearRect(0, 0, 16, 16);
+  m.sx.drawImage(m.M, 0, 0, 16, 16);
+  const d = m.sx.getImageData(0, 0, 16, 16).data;
+  let s = 0, n = 0;
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    if ((x - 7.5) ** 2 + (y - 7.5) ** 2 > 7.2 * 7.2) continue;
+    s += d[(y * 16 + x) * 4 + 3]; n++;
+  }
+  m.mean = s / (n * 255);
+  return m.mean;
+}
+
+function drawMix(ctx, pv) {
+  const m = pv.mix, g = pv.g;
+  const cx = m.C.getContext('2d');
+  cx.save();
+  cx.clearRect(0, 0, CS, CS);
+  cx.translate(CS / 2, CS / 2); cx.rotate(m.texAng);
+  const D = CS * 1.45;
+  cx.drawImage(img('tex_curry'), -D / 2, -D / 2, D, D);
+  cx.restore();
+  cx.globalCompositeOperation = 'destination-in';
+  cx.drawImage(m.M, 0, 0, CS, CS);
+  cx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(m.C, g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
+  // glossy swirl highlights rotating with the stir
+  const a = clamp(m.mean * 1.2 - 0.1, 0, 1);
+  if (a > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 4; i++) {
+      const r = g.ir * (0.25 + i * 0.17);
+      const st = m.texAng * (1.3 - i * 0.15) + i * 1.9;
+      ctx.strokeStyle = `rgba(255,235,200,${0.13 * a})`;
+      ctx.lineWidth = 10 - i;
+      ctx.beginPath(); ctx.arc(g.ix, g.iy, r, st, st + 0.7); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  if (m.sweep >= 0 && m.sweep < 1) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const p = g.ix - g.ir * 1.6 + m.sweep * g.ir * 3.2;
+    const gr = ctx.createLinearGradient(p - 80, g.iy - g.ir, p + 80, g.iy + g.ir);
+    gr.addColorStop(0, 'rgba(255,240,210,0)'); gr.addColorStop(0.5, 'rgba(255,240,210,0.55)'); gr.addColorStop(1, 'rgba(255,240,210,0)');
+    ctx.fillStyle = gr; ctx.fillRect(g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
+    ctx.restore();
+  }
+}
+
+export { lerp };

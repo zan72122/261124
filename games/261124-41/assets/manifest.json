@@ -1,0 +1,521 @@
+{
+ "coords": "pixels of the delivered image, origin top-left",
+ "files": [
+  {
+   "file": "basket.webp",
+   "w": 989,
+   "h": 1000,
+   "alpha": true,
+   "inner": {
+    "cx": 503,
+    "cy": 506,
+    "rx": 400,
+    "ry": 405
+   }
+  },
+  {
+   "file": "bg_counter.webp",
+   "w": 1280,
+   "h": 1280,
+   "alpha": false
+  },
+  {
+   "file": "bg_stove.webp",
+   "w": 1280,
+   "h": 1280,
+   "alpha": false,
+   "burner": {
+    "cx": 640,
+    "cy": 640,
+    "r": 320
+   },
+   "note": "composited: generated grate cut out and placed on procedural black glass"
+  },
+  {
+   "file": "bg_table.webp",
+   "w": 1280,
+   "h": 1280,
+   "alpha": false,
+   "note": "procedural linen gingham (no credits)"
+  },
+  {
+   "file": "bgm.mp3",
+   "duration": null
+  },
+  {
+   "file": "board.webp",
+   "w": 1055,
+   "h": 863,
+   "alpha": true,
+   "usable": {
+    "x": 68.1,
+    "y": 69.1,
+    "w": 916.8,
+    "h": 725.8
+   }
+  },
+  {
+   "file": "bowl_water.webp",
+   "w": 987,
+   "h": 1000,
+   "alpha": true,
+   "inner": {
+    "cx": 493,
+    "cy": 499.5,
+    "r": 470
+   }
+  },
+  {
+   "file": "carrot.webp",
+   "w": 720,
+   "h": 375,
+   "alpha": true,
+   "body": {
+    "x0": 103.0,
+    "x1": 530.0,
+    "cy": 223.3
+   }
+  },
+  {
+   "file": "carrot_flower.webp",
+   "w": 260,
+   "h": 252,
+   "alpha": true
+  },
+  {
+   "file": "carrot_heart.webp",
+   "w": 260,
+   "h": 228,
+   "alpha": true
+  },
+  {
+   "file": "carrot_slice_1.webp",
+   "w": 260,
+   "h": 260,
+   "alpha": true
+  },
+  {
+   "file": "carrot_slice_2.webp",
+   "w": 260,
+   "h": 260,
+   "alpha": true
+  },
+  {
+   "file": "carrot_slice_3.webp",
+   "w": 260,
+   "h": 259,
+   "alpha": true
+  },
+  {
+   "file": "carrot_star.webp",
+   "w": 260,
+   "h": 248,
+   "alpha": true
+  },
+  {
+   "file": "curry-stir.mp4",
+   "w": 1280,
+   "h": 720,
+   "duration": 8.0
+  },
+  {
+   "file": "dish.webp",
+   "w": 399,
+   "h": 396,
+   "alpha": true,
+   "inner": {
+    "cx": 199,
+    "cy": 198,
+    "rx": 125,
+    "ry": 124
+   }
+  },
+  {
+   "file": "girl_focus.webp",
+   "w": 400,
+   "h": 400,
+   "alpha": false
+  },
+  {
+   "file": "girl_happy.webp",
+   "w": 400,
+   "h": 400,
+   "alpha": false
+  },
+  {
+   "file": "girl_smile.webp",
+   "w": 400,
+   "h": 400,
+   "alpha": false
+  },
+  {
+   "file": "girl_wow.webp",
+   "w": 400,
+   "h": 400,
+   "alpha": false
+  },
+  {
+   "file": "hero_curry.webp",
+   "w": 1280,
+   "h": 1280,
+   "alpha": false,
+   "note": "image shrunk so plate is ~62% width; border extended with blurred mirror (depth-of-field look); no flower carrots, has parsley"
+  },
+  {
+   "file": "jug.webp",
+   "w": 520,
+   "h": 412,
+   "alpha": true,
+   "head": {
+    "x": 24.0,
+    "y": 131.4,
+    "r": 22
+   },
+   "grip": {
+    "x": 470.0,
+    "y": 288.4
+   }
+  },
+  {
+   "file": "knife.webp",
+   "w": 760,
+   "h": 97,
+   "alpha": true,
+   "tip": {
+    "x": 4.0,
+    "y": 30.0
+   },
+   "edge": [
+    {
+     "x": 4.0,
+     "y": 30.0
+    },
+    {
+     "x": 423.0,
+     "y": 88.0
+    }
+   ],
+   "grip": {
+    "x": 630.3,
+    "y": 24.3
+   }
+  },
+  {
+   "file": "ladle_curry.webp",
+   "w": 640,
+   "h": 576,
+   "alpha": true,
+   "head": {
+    "x": 111.0,
+    "y": 476.0,
+    "r": 94.8
+   },
+   "grip": {
+    "x": 539.9,
+    "y": 115.2
+   },
+   "note": "fallback: ladle cut from a generated pot-of-curry image, rim ring retouched"
+  },
+  {
+   "file": "lid.webp",
+   "w": 759,
+   "h": 760,
+   "alpha": true,
+   "cx": 379,
+   "cy": 379.5,
+   "r": 377
+  },
+  {
+   "file": "mama_aan.webp",
+   "w": 400,
+   "h": 400,
+   "alpha": false,
+   "note": "PIL-edited from mama_wow base (mouth enlarged)"
+  },
+  {
+   "file": "mama_laugh.webp",
+   "w": 400,
+   "h": 400,
+   "alpha": false,
+   "note": "second generated sheet, same character design"
+  },
+  {
+   "file": "mama_smile.webp",
+   "w": 400,
+   "h": 400,
+   "alpha": false,
+   "note": "PIL-edited from mama_wow base (closed smile drawn)"
+  },
+  {
+   "file": "mama_tired.webp",
+   "w": 400,
+   "h": 400,
+   "alpha": false,
+   "note": "PIL-edited from mama_wow base (droopy lids, sweat drop, gloom lines)"
+  },
+  {
+   "file": "mama_wow.webp",
+   "w": 400,
+   "h": 400,
+   "alpha": false
+  },
+  {
+   "file": "meat_cooked_1.webp",
+   "w": 190,
+   "h": 220,
+   "alpha": true,
+   "note": "recolour of meat_raw_1"
+  },
+  {
+   "file": "meat_cooked_2.webp",
+   "w": 200,
+   "h": 220,
+   "alpha": true,
+   "note": "recolour of meat_raw_2"
+  },
+  {
+   "file": "meat_cooked_3.webp",
+   "w": 215,
+   "h": 220,
+   "alpha": true,
+   "note": "recolour of meat_raw_3"
+  },
+  {
+   "file": "meat_raw_1.webp",
+   "w": 190,
+   "h": 220,
+   "alpha": true
+  },
+  {
+   "file": "meat_raw_2.webp",
+   "w": 200,
+   "h": 220,
+   "alpha": true
+  },
+  {
+   "file": "meat_raw_3.webp",
+   "w": 215,
+   "h": 220,
+   "alpha": true
+  },
+  {
+   "file": "onion.webp",
+   "w": 449,
+   "h": 404,
+   "alpha": true
+  },
+  {
+   "file": "onion_wedge_1.webp",
+   "w": 240,
+   "h": 234,
+   "alpha": true
+  },
+  {
+   "file": "onion_wedge_2.webp",
+   "w": 223,
+   "h": 240,
+   "alpha": true
+  },
+  {
+   "file": "onion_wedge_3.webp",
+   "w": 213,
+   "h": 240,
+   "alpha": true
+  },
+  {
+   "file": "onion_wedge_4.webp",
+   "w": 240,
+   "h": 184,
+   "alpha": true
+  },
+  {
+   "file": "plate_empty.webp",
+   "w": 1000,
+   "h": 1000,
+   "alpha": true,
+   "well": {
+    "cx": 499.7,
+    "cy": 499.7,
+    "r": 396.8
+   },
+   "note": "derived procedurally (food area filled with plate glaze); registered with plate_full"
+  },
+  {
+   "file": "plate_full.webp",
+   "w": 1000,
+   "h": 1000,
+   "alpha": true,
+   "well": {
+    "cx": 499.7,
+    "cy": 499.7,
+    "r": 396.8
+   },
+   "rice": {
+    "x": 391.4,
+    "y": 590.4
+   },
+   "curry": {
+    "x": 577.8,
+    "y": 421.2
+   }
+  },
+  {
+   "file": "plate_rice.webp",
+   "w": 1000,
+   "h": 1000,
+   "alpha": true,
+   "well": {
+    "cx": 499.7,
+    "cy": 499.7,
+    "r": 396.8
+   },
+   "rice": {
+    "x": 498.2,
+    "y": 493.6
+   },
+   "note": "derived via inpaint (curry region repainted as rice); registered with plate_full"
+  },
+  {
+   "file": "pot.webp",
+   "w": 1000,
+   "h": 845,
+   "alpha": true,
+   "inner": {
+    "cx": 498,
+    "cy": 421.5,
+    "r": 390
+   },
+   "outer": {
+    "cx": 498,
+    "cy": 421.5,
+    "r": 415.5
+   }
+  },
+  {
+   "file": "potato.webp",
+   "w": 382,
+   "h": 520,
+   "alpha": true
+  },
+  {
+   "file": "potato_chunk_1.webp",
+   "w": 187,
+   "h": 240,
+   "alpha": true
+  },
+  {
+   "file": "potato_chunk_2.webp",
+   "w": 240,
+   "h": 237,
+   "alpha": true
+  },
+  {
+   "file": "potato_chunk_3.webp",
+   "w": 240,
+   "h": 140,
+   "alpha": true
+  },
+  {
+   "file": "potato_chunk_4.webp",
+   "w": 187,
+   "h": 240,
+   "alpha": true
+  },
+  {
+   "file": "roux_1.webp",
+   "w": 220,
+   "h": 201,
+   "alpha": true
+  },
+  {
+   "file": "roux_2.webp",
+   "w": 215,
+   "h": 220,
+   "alpha": true
+  },
+  {
+   "file": "roux_3.webp",
+   "w": 210,
+   "h": 220,
+   "alpha": true
+  },
+  {
+   "file": "roux_4.webp",
+   "w": 201,
+   "h": 220,
+   "alpha": true,
+   "note": "mirrored/rotated copy of roux_1"
+  },
+  {
+   "file": "roux_tray.webp",
+   "w": 520,
+   "h": 520,
+   "alpha": true,
+   "note": "assembled from a roux block"
+  },
+  {
+   "file": "shamoji_rice.webp",
+   "w": 300,
+   "h": 640,
+   "alpha": true,
+   "head": {
+    "x": 149.0,
+    "y": 434.0,
+    "r": 145.2
+   },
+   "grip": {
+    "x": 161.3,
+    "y": 81.4
+   },
+   "note": "wooden (not white) paddle"
+  },
+  {
+   "file": "spatula.webp",
+   "w": 556,
+   "h": 760,
+   "alpha": true,
+   "head": {
+    "x": 448.0,
+    "y": 107.0,
+    "r": 100.7
+   },
+   "grip": {
+    "x": 91.3,
+    "y": 633.4
+   }
+  },
+  {
+   "file": "spoon.webp",
+   "w": 119,
+   "h": 443,
+   "alpha": true,
+   "head": {
+    "x": 59.0,
+    "y": 74.0,
+    "r": 52.0
+   },
+   "grip": {
+    "x": 65.6,
+    "y": 368.4
+   }
+  },
+  {
+   "file": "stir-audio.mp3",
+   "duration": 8.04
+  },
+  {
+   "file": "tex_curry.webp",
+   "w": 1024,
+   "h": 1024,
+   "alpha": false
+  },
+  {
+   "file": "tex_rice.webp",
+   "w": 1024,
+   "h": 1024,
+   "alpha": false,
+   "note": "rice in small clumps, slightly odd pattern"
+  }
+ ],
+ "stir_audio_envelope": "continuous stirring/bubbling ~-24..-28 dB RMS from 0 to 5.7 s, peaks at 1.75 s and 5.5 s (~-6 dB), smaller at 3.0 and 4.5 s; near silence 6.0-6.5 s; short burst ~6.75 s; fades to silence 7.25-8.0 s. Overall mean -26.6 dB, max -4.5 dB."
+}

@@ -1,7 +1,7 @@
 // cut — tap anywhere: the helper knife chops carrot, potato, onion; slices become pieces in neat piles.
-import { TAU, rnd, ease, Spring, lerp, clamp } from '../engine.js';
+import { TAU, rnd, ease, Spring, lerp, clamp, canvas2d, bucket, pxScale } from '../engine.js';
 import { spr, shadow, backdrop } from '../sprite.js';
-import { size, geo } from '../assets.js';
+import { size, geo, img } from '../assets.js';
 import { fx, hint } from '../fx.js';
 import { bubbles } from '../bubbles.js';
 import { snd } from '../snd.js';
@@ -65,6 +65,22 @@ function segPath(ctx, s, ox = 0, oy = 0) {
   ctx.moveTo(xl(y0) + ox, y0 + oy); ctx.lineTo(xr(y0) + ox, y0 + oy);
   ctx.lineTo(xr(y1) + ox, y1 + oy); ctx.lineTo(xl(y1) + ox, y1 + oy);
   ctx.closePath();
+}
+
+// opaque part of a photo, as 0..1 of its width/height (read once from a small copy, never per frame)
+const opaque = {};
+function opaqueBox(name) {
+  if (opaque[name]) return opaque[name];
+  const N = 64, c = canvas2d(N, N), x = c.getContext('2d', { willReadFrequently: true });
+  x.drawImage(img(name), 0, 0, N, N);
+  let box = { x0: 0, y0: 0, x1: 1, y1: 1 };
+  try {
+    const d = x.getImageData(0, 0, N, N).data;
+    let a = N, b = N, e = -1, f = -1;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (d[(j * N + i) * 4 + 3] > 2) { a = Math.min(a, i); b = Math.min(b, j); e = Math.max(e, i); f = Math.max(f, j); }
+    if (e >= 0) box = { x0: Math.max(0, (a - 1) / N), y0: Math.max(0, (b - 1) / N), x1: Math.min(1, (e + 2) / N), y1: Math.min(1, (f + 2) / N) };
+  } catch (err) { /* keep the full box */ }
+  return (opaque[name] = box);
 }
 
 export default function cut() {
@@ -194,15 +210,55 @@ export default function cut() {
     }
   }
 
+  // Each strip (its clipped shadow and its clipped slice of the photo) is pre-rendered once per
+  // vegetable and pixel size, so the strips are plain drawImage calls instead of 8 clip paths a frame.
+  let stripCache = null;
+  function stripSprites(px) {
+    const key = veg.name + '|' + px;
+    if (stripCache && stripCache.key === key && stripCache.veg === veg) return stripCache.list;
+    const s = size(veg.name);
+    const hh = veg.w * s.h / s.w;
+    // bounding box of the photo's opaque part, rotated (+ the shadow's blur pad and offset)
+    const o = opaqueBox(veg.name);
+    let X0 = Infinity, X1 = -Infinity, Y0 = Infinity, Y1 = -Infinity;
+    const c = Math.cos(veg.rot), sn = Math.sin(veg.rot);
+    for (const [u, v] of [[o.x0, o.y0], [o.x1, o.y0], [o.x0, o.y1], [o.x1, o.y1]]) {
+      const lx = (u - 0.5) * veg.w, ly = (v - 0.5) * hh;
+      const X = veg.x + lx * c - ly * sn, Y = veg.y + lx * sn + ly * c;
+      X0 = Math.min(X0, X); X1 = Math.max(X1, X); Y0 = Math.min(Y0, Y); Y1 = Math.max(Y1, Y);
+    }
+    const pad = Math.max(veg.w, hh) * 0.08 + 6;
+    X0 -= pad; Y0 = Math.max(VY - 420, Y0 - pad); X1 += pad + 10; Y1 = Math.min(VY + 427, Y1 + pad + 14);
+    const list = segs.map((g) => {
+      const xs = [g.l.x + Math.tan(g.l.a) * (Y0 - VY), g.l.x + Math.tan(g.l.a) * (Y1 - VY), g.r.x + Math.tan(g.r.a) * (Y0 - VY), g.r.x + Math.tan(g.r.a) * (Y1 - VY)];
+      const x0 = Math.max(X0, Math.min(...xs) - 2), x1 = Math.min(X1, Math.max(...xs) + 10);
+      if (x1 <= x0) return null;
+      const out = [];
+      for (let pass = 0; pass < 2; pass++) {
+        const cv = canvas2d((x1 - x0) * px, (Y1 - Y0) * px), x = cv.getContext('2d');
+        x.scale(cv.width / (x1 - x0), cv.height / (Y1 - Y0));
+        x.translate(-x0, -Y0);
+        segPath(x, g, pass === 0 ? 4 : 0, pass === 0 ? 7 : 0);
+        x.clip();
+        if (pass === 0) shadow(x, veg.name, veg.x, veg.y, veg.w, hh, 0, veg.rot, 1, 1, 0.5, 0.5, 1);
+        else spr(x, veg.name, veg.x, veg.y, veg.w, { rot: veg.rot, shadow: false });
+        out.push(cv);
+      }
+      return { x0, y0: Y0, w: x1 - x0, h: Y1 - Y0, c: out };
+    });
+    stripCache = { key, veg, list };
+    return list;
+  }
+
   function drawVeg(ctx) {
     if (!veg) return;
     const sl = veg.slide;
-    const s = size(veg.name);
-    const hh = veg.w * s.h / s.w;
+    const list = stripSprites(bucket(pxScale(ctx), 0.25, 8));
     // pass 1: shadows of all strips; pass 2: the strips
     for (let pass = 0; pass < 2; pass++) {
-      for (const g of segs) {
-        if (g.alpha <= 0.01) continue;
+      for (let i = 0; i < segs.length; i++) {
+        const g = segs[i], sp = list[i];
+        if (g.alpha <= 0.01 || !sp) continue;
         ctx.save();
         ctx.globalAlpha = g.alpha;
         ctx.translate(g.cx + g.dx + sl, VY + g.dy);
@@ -210,10 +266,7 @@ export default function cut() {
         const sc = (1 + g.pop) * (1 + g.sq.x * 0.03);
         ctx.scale(sc, sc);
         ctx.translate(-g.cx, -VY);
-        segPath(ctx, g, pass === 0 ? 4 : 0, pass === 0 ? 7 : 0);
-        ctx.clip();
-        if (pass === 0) shadow(ctx, veg.name, veg.x, veg.y, veg.w, hh, 0, veg.rot, 1, 1, 0.5, 0.5, 1);
-        else spr(ctx, veg.name, veg.x, veg.y, veg.w, { rot: veg.rot, shadow: false });
+        ctx.drawImage(sp.c[pass], sp.x0, sp.y0, sp.w, sp.h);
         ctx.restore();
       }
     }

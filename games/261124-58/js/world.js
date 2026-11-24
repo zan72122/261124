@@ -100,7 +100,7 @@ export function makeRoom({ w, back, front, h = 3, wall = '#f4ebdb' }) {
   const backW = mesh(new THREE.PlaneGeometry(w, h), wallMat, false, true); backW.position.set(0, h / 2, back); g.add(backW);
   const left = mesh(new THREE.PlaneGeometry(d, h), wallMat, false, true); left.rotation.y = Math.PI / 2; left.position.set(-w / 2, h / 2, cz); g.add(left);
   const right = mesh(new THREE.PlaneGeometry(d, h), wallMat, false, true); right.rotation.y = -Math.PI / 2; right.position.set(w / 2, h / 2, cz); g.add(right);
-  const ceil = mesh(new THREE.PlaneGeometry(w, d), stdMat('#fffaf2', 0.9), false, false); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, h, cz); g.add(ceil);
+  const ceil = mesh(new THREE.PlaneGeometry(w, d), stdMat('#fffaf2', 0.9, { emissive: '#e9e1d4', emissiveIntensity: 0.75 }), false, false); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, h, cz); g.add(ceil);
   // wainscot panels + rail
   const wm = new THREE.MeshStandardMaterial({ map: woodTex(30, 72, [3, 1]), roughness: 0.5 });
   const ph = 0.85;
@@ -382,7 +382,7 @@ export function flyTo(obj, newParent, pos, { dur = 0.6, arc = 0.25, quat = null,
 }
 export function popIn(obj, dur = 0.45, to = 1) {
   obj.visible = true;
-  const base = obj.userData.baseScale || (obj.userData.baseScale = obj.scale.clone());
+  const base = obj.userData.baseScale || (obj.userData.baseScale = obj.scale.x < 0.01 ? new V3(1, 1, 1) : obj.scale.clone());
   return tween(dur, k => { obj.scale.copy(base).multiplyScalar(Math.max(0.0001, k * to)); }, (k) => { const c = 1.70158 * 1.4, c3 = c + 1; return 1 + c3 * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); });
 }
 export function popOut(obj, dur = 0.3) {

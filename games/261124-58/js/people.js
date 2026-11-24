@@ -147,9 +147,9 @@ export function makePerson(o) {
     hips.add(pantsTop);
   }
   if (o.apron) {
-    const ap = new THREE.Mesh(new THREE.CylinderGeometry(tw * 1.12, tw * 1.42, P.torso * 1.1, 24, 1, true, -0.9, 1.8),
+    const ap = new THREE.Mesh(new THREE.CylinderGeometry(tw * 1.1, tw * 1.7, P.torso * 1.05, 24, 1, true, -0.9, 1.8),
       new THREE.MeshStandardMaterial({ color: '#ffffff', map: noiseTex(o.apron, 14, 128, [3, 3]), roughness: 0.9, side: THREE.DoubleSide }));
-    ap.rotation.y = 0; ap.position.set(0, P.torso * 0.32, 0.005); ap.castShadow = true;
+    ap.position.set(0, P.torso * 0.32, 0.005); ap.castShadow = false; ap.receiveShadow = false;
     // CylinderGeometry thetaStart 0 is +z
     hips.add(ap);
   }

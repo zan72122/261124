@@ -150,7 +150,7 @@ let cork, clockG, shelf, basket, tableG, cloth, rug, sign, bunting;
   }), false, true);
   rug.rotation.x = -Math.PI / 2; rug.position.set(0, 0.005, -0.4); rug.scale.set(1.25, 0.8, 1); C.add(rug);
   sign = new THREE.Group();
-  const sg = mesh(new THREE.PlaneGeometry(1.5, 0.75), new THREE.MeshStandardMaterial({ map: signTex(), roughness: 0.8 }), false, true); sg.position.z = 0.012; sign.add(sg);
+  const sg = mesh(new THREE.PlaneGeometry(1.5, 0.75), new THREE.MeshStandardMaterial({ map: signTex(), roughness: 0.8 }), false, true); sg.position.z = 0.02; sign.add(sg);
   const sfr = mesh(new THREE.BoxGeometry(1.6, 0.85, 0.025), new THREE.MeshStandardMaterial({ color: '#ff9fc6', roughness: 0.6 })); sign.add(sfr);
   sign.position.set(0.1, 1.75, -2.96); sign.visible = false; C.add(sign);
   bunting = new THREE.Group();
@@ -514,9 +514,9 @@ async function sceneSlime() {
         if (D.y < -0.05) D.y = -0.05;
         const L = D.length();
         if (L > 0.07) sfx.stretch();
-        S.D.copy(D).clampLength(0, 0.6);
+        S.D.copy(D).clampLength(0, 0.45);
         lookAtWorld(girl, S.p0w);
-        if (L > 0.46 && !st.piece) {
+        if (L > 0.27 && !st.piece) {
           // tear a piece off!
           const pc = mesh(pieceGeo, slimeMat); pc.scale.set(1, 0.8, 1);
           pc.position.copy(S.p0w).add(S.D).sub(CB);
@@ -638,7 +638,7 @@ function blockPatternTex() {
 async function sceneBlocks() {
   lightAt(CB);
   if (girl.root.parent !== C) { seatKids(); await shot(...CLASS_SHOT(), 0); await fade(0, 0.5); }
-  const BLOCK_SHOT = [toW(new V3(0.25, 2.1, 5.0)), toW(new V3(0.25, 1.35, -0.9)), 3.1, 1.7];
+  const BLOCK_SHOT = [toW(new V3(0.3, 1.9, 5.4)), toW(new V3(0.3, 1.4, -1.0)), 3.0, 1.65];
   shot(...BLOCK_SHOT, 1.6);
   const blocks = [];
   const mk = (x, y, z, ci, kind, col = -1, row = -1) => {
@@ -676,7 +676,7 @@ async function sceneBlocks() {
   [girl, ...friends].forEach((p, i) => setTimeout(() => { p.setExpr('happy', 1.2); sfx.giggle(p.voice); }, i * 150));
   setMood(0);
   // tower spot + hanging star
-  const TOWER = new V3(2.55, 0, 0.55), NEED = 5;
+  const TOWER = new V3(2.45, 0, -1.35), NEED = 5;
   const mat = mesh(new THREE.CircleGeometry(0.42, 32), stdMat('#fff2b3', 0.9), false, true); mat.rotation.x = -Math.PI / 2; mat.position.set(TOWER.x, 0.006, TOWER.z); C.add(mat);
   const starG = new THREE.Group();
   const shape = new THREE.Shape();
@@ -970,6 +970,7 @@ function makeFruit(kind) {
 async function sceneBalloons(prev) {
   lightAt(CB);
   if (girl.root.parent !== C) { seatKids(); await fade(0, 0.5); }
+  tableG.visible = false;
   const BAL_SHOT = [toW(new V3(0, 2.75, 4.3)), toW(new V3(0, 0.35, -0.75)), 2.85, 1.55];
   shot(...BAL_SHOT, 1.8);
   // fruits hidden on the floor
@@ -1093,7 +1094,7 @@ async function sceneBalloons(prev) {
 // =====================================================================
 // SCENE 3: green juice party
 // =====================================================================
-function glassMat() { return new THREE.MeshPhysicalMaterial({ color: '#eaf6ff', roughness: 0.04, metalness: 0, clearcoat: 1, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }); }
+function glassMat() { return new THREE.MeshPhysicalMaterial({ color: '#cfeaff', roughness: 0.05, metalness: 0, clearcoat: 1, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 2 }); }
 const juiceMat = new THREE.MeshPhysicalMaterial({ color: '#c9d98a', roughness: 0.18, clearcoat: 0.6, emissive: '#0d2a05', emissiveIntensity: 0.3 });
 const cupJuiceMat = new THREE.MeshPhysicalMaterial({ color: '#56d13c', roughness: 0.15, clearcoat: 0.6, emissive: '#0d2a05', emissiveIntensity: 0.4 });
 
@@ -1267,6 +1268,8 @@ async function sceneParty(prevB) {
     // teacher lifts her cup way up... and it tips onto her face
     st.gag = 'running'; st.busy = true;
     await wait(0.3);
+    const tp = toL(teacher.head.getWorldPosition(new V3()));
+    shot(toW(new V3(tp.x - 0.5, tp.y + 0.15, tp.z + 2.2)), toW(new V3(tp.x - 0.25, tp.y - 0.12, tp.z)), 0.95, 0.6, 0.8);
     teacher.setPose('holdUp', 2.5); teacher.setExpr('happy', 1.2); sfx.ooh(0.75);
     await wait(0.8);
     await tween(0.35, k => { c.tilt = -k * 2.4; });
@@ -1285,11 +1288,14 @@ async function sceneParty(prevB) {
     teacher.tiltT = 0;
     // a towel appears for the girl to help
     towel.visible = true; towel.scale.setScalar(0.001); popIn(towel); sfx.sparkle();
+    await wait(1.2);
+    shot(...PARTY_SHOT, 1.0);
     st.gag = 'towel'; st.busy = false;
   };
   const wipeFace = async () => {
     st.gag = 'wiping'; st.busy = true;
     sfx.pick();
+    { const tp = toL(teacher.head.getWorldPosition(new V3())); shot(toW(new V3(tp.x - 0.6, tp.y + 0.1, tp.z + 2.4)), toW(new V3(tp.x - 0.4, tp.y - 0.3, tp.z)), 1.1, 0.7, 0.6); }
     girl.setPose('reach', 1.6); lookAtWorld(girl, teacher.root.getWorldPosition(new V3()));
     await flyTo(towel, teacher.head, new V3(0, -0.02, teacher.P.head * 1.25), { dur: 0.5, arc: 0.2, quat: new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0)) });
     teacher.setExpr('happy', 3);
@@ -1302,6 +1308,8 @@ async function sceneParty(prevB) {
     burst(q.add(new V3(0, 0.2, 0)), { n: 30, colors: ['#ffffff', '#ffe066', '#ff9fc6'], speed: 1.3, size: 0.05 });
     // she gives a big hug-ish thank you
     teacher.setPose('clap', 1.2);
+    await wait(0.8);
+    shot(...PARTY_SHOT, 1.0);
     st.gag = 'done'; st.busy = false;
   };
   const kanpai = async () => {

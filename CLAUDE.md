@@ -11,6 +11,7 @@
 
 ## games/261124-41「おてつだいカレー」
 - `js/engine.js` 単位系（短辺=1000）・入力・時計 / `js/layout.js` 主役と脇役と顔ワイプの配置 / `js/fx.js` 影・湯気・ヒント / `js/bubbles.js` 顔ワイプ / `js/potview.js` 鍋とカレーへの変化 / `js/scenes/*.js` 場面ごと / `js/audio.js` 合成効果音とBGM。
+- 主人公の女の子は `js/chef.js`（`assets/sprite-girl/` の鍋つき全身スプライト100コマ・12fps）。タイトル・鍋・ルーの場面では顔ワイプの代わりに角丸の窓で全身を出す（`bubbles.girl.useChef`）。具材の投入コマ（にんじん30・じゃがいも47・たまねぎ64）は上から見た鍋への1個目の着地に合わせ、ルーでは指で混ぜる勢いで混ぜる速さが変わる。触ると笑う。
 - 画像は `assets/*.webp`、寸法と当たり位置は `assets/manifest.json`。
 - 確認用: `?scene=<title|home|wash|cut|stamp|pot|roux|serve|eat|end>`、`?mute=1`、`?novideo=1`、`window.__game`。
 

@@ -59,9 +59,12 @@ export function frame(prim, items = [], o = {}) {
   }
   // vertical: bubbles in the top band, primary below, secondaries in a row under it
   const d = Math.max(mb, Math.min(want, (E.w - 3 * M) / 2.2));
-  const dg = o.chef ? Math.max(d, Math.min(d * 1.25, E.w - 4 * M - d)) : d;
-  const topBand = dg + 2 * M;
   const needRow = n ? minSec + 2 * M : 0;
+  // o.chef: the girl's window grows (up to 1.25x) only into height nobody else needs
+  const k0 = Math.min(1, (E.w - 2 * M) / prim.w);
+  const spare = E.h - (d + 2 * M) - prim.h * k0 - needRow;
+  const dg = o.chef ? d + Math.max(0, Math.min(d * 0.25, E.w - 4 * M - 2 * d, spare)) : d;
+  const topBand = dg + 2 * M;
   let k = Math.min(1, (E.w - 2 * M) / prim.w);
   if (E.h - topBand - prim.h * k < needRow) k = Math.max(o.minK ?? 0.6, (E.h - topBand - needRow) / prim.h);
   const hh = prim.h * k;

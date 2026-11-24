@@ -83,15 +83,30 @@ function brickTex(palette, seed = 1) {
   });
 }
 
+
+// 段ボール：平らな茶色にうっすら波目と繊維
+let _card = null;
+function cardTex() {
+  if (_card) return _card;
+  _card = canvasTex(512, 512, (x) => {
+    x.fillStyle = '#c4935a'; x.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 512; i += 16) { x.fillStyle = 'rgba(90,55,20,.06)'; x.fillRect(i, 0, 7, 512); x.fillStyle = 'rgba(255,230,190,.05)'; x.fillRect(i + 8, 0, 5, 512); }
+    for (let i = 0; i < 5000; i++) { x.fillStyle = Math.random() < 0.5 ? 'rgba(80,50,20,.10)' : 'rgba(255,235,200,.10)'; x.fillRect(Math.random() * 512, Math.random() * 512, 1 + Math.random() * 3, 1); }
+    x.fillStyle = 'rgba(70,40,15,.12)';
+    for (let i = 0; i < 6; i++) { x.beginPath(); x.ellipse(Math.random() * 512, Math.random() * 512, 30 + Math.random() * 60, 12 + Math.random() * 20, Math.random() * 3, 0, 7); x.fill(); }
+  });
+  return _card;
+}
+
 export function makeKit(kind) {
   if (kind === 'card') {
-    const map = tex('cardboard');
-    const wall = new THREE.MeshStandardMaterial({ map, bumpMap: map, bumpScale: 0.8, roughness: 0.92, color: 0xffeedd });
-    const roof = new THREE.MeshStandardMaterial({ map, bumpMap: map, bumpScale: 0.8, roughness: 0.92, color: 0xe8c39a });
+    const map = cardTex();
+    const wall = new THREE.MeshStandardMaterial({ map, bumpMap: map, bumpScale: 0.6, roughness: 0.92, color: 0xffffff });
+    const roof = new THREE.MeshStandardMaterial({ map, bumpMap: map, bumpScale: 0.6, roughness: 0.92, color: 0xd8b088 });
     const accent = new THREE.MeshStandardMaterial({ map, roughness: 0.9, color: 0xf2dcc0 });
     const tape = new THREE.MeshStandardMaterial({ color: 0xc9a05e, roughness: 0.3, transparent: true, opacity: 0.85 });
     const soft = new THREE.MeshStandardMaterial({ color: 0xf6f1e6, roughness: 0.95 });
-    return { kind, wall, roof, accent, tape, soft, r: 0.012, roofT: 0.1, uv: 0.45, studs: false };
+    return { kind, wall, roof, accent, tape, soft, r: 0.012, roofT: 0.1, uv: 0.8, studs: false };
   }
   if (kind === 'fluff') {
     const map = tex('fur');

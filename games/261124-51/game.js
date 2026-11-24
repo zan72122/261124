@@ -16,7 +16,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x8fc3f0);
-scene.fog = new THREE.Fog(0xcfe2f2, 28, 70);
+scene.fog = new THREE.Fog(0xa8c294, 30, 75);
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
 
 // 環境光（空のグラデーションから）
@@ -460,7 +460,7 @@ async function scene0() {
 
 // 素材の山
 const KINDS = ['card', 'fluff', 'blocks'];
-function pileSpots() { return portrait() ? [-1.55, 0, 1.55] : [-2.3, 0, 2.3]; }
+function pileSpots() { return portrait() ? [-1.4, 0, 1.4] : [-2.3, 0, 2.3]; }
 function newRound() {
   if (state.round) { scene.remove(state.round.root); }
   const root = new THREE.Group(); scene.add(root);
@@ -497,7 +497,7 @@ async function scene1() {
   state.scene = 1;
   const rd = state.round || newRound();
   setRule('build');
-  shot([0.1, 0.5, 3.3], 3.5, 2.3, [0, 0.62, 1], { phw: 2.3, speed: 1.2, depth: 1.6 });
+  shot([0.1, 0.5, 3.3], 3.5, 2.3, [0, 0.62, 1], { phw: 2.7, speed: 1.2, depth: 1.6 });
   dad.g.position.set(-2.45, 0, 0.85); dad.g.rotation.y = 0.5; dad.st.pose = 'stand'; dad.setFace('smile');
   girl.g.position.copy(GIRL_HOME); girl.g.rotation.y = -0.55;
   let chosen;
@@ -960,7 +960,7 @@ async function scene3() {
     const door = rd.pieces.find(p => p.id === 'door').group;
     sfx.creak(); await tween(0.6, k => door.rotation.y = -1.7 * k);
     const doorX = DOOR_X0 + 0.45;
-    const inside = [[boy, 0.75, 0.05], [mom, -0.1, 0.25], [dad, 0.1, -0.55], [dog, -0.45, 0.65]];
+    const inside = [[boy, 0.75, 0.05], [mom, -0.25, 0.05], [dad, 0.15, 0.75], [dog, -0.65, 0.8]];
     await Promise.all(inside.map(async ([p, x, z], i) => {
       await wait(i * 0.5);
       await walkTo(p, doorX, 2.2, 2.0);
@@ -973,7 +973,7 @@ async function scene3() {
     await wait(0.3);
     // ドールハウスのように前があく
     sfx.swoosh();
-    shot([0, 0.95, 1.2], 2.3, 1.55, [0, 0.5, 1], { phw: 1.95, speed: 1.0 });
+    shot([0, 1.15, 0.9], 2.5, 1.85, [0, 0.2, 1], { phw: 2.0, speed: 1.0, depth: 1.5 });
     await tween(1.2, k => rd.front.rotation.x = OPEN * k, ease.io);
     sfx.thud();
     const chair = rd.pieces.find(p => p.id === 'chair');
@@ -1119,7 +1119,8 @@ window.__gf = {
   async autoStep() {
     if (busy || !mode) return false;
     if (mode.pick) {
-      const p = mode.pick().find(q => !q.enabled || q.enabled());
+      const list = mode.pick().filter(q => !q.enabled || q.enabled());
+      const p = state.scene === 1 && !state.round.kind ? list[Number(Q.get('pile') || 0)] : list[0];
       if (p) { p.tap && p.tap(); return true; }
     }
     if (mode.onDown) {
@@ -1129,6 +1130,13 @@ window.__gf = {
     return false;
   },
   setSpeed(s) { timeScale = s; },
+  scr(name) {
+    const map = { mom, dad, boy, dog, girl };
+    if (map[name]) return toScreen(map[name].center());
+    const p = state.round.pieces.find(q => q.id === name);
+    return p && toScreen(p.group.getWorldPosition(new V3()).add(new V3(0, 0.35, 0)));
+  },
+  pose(name) { const p = { mom, dad, boy, dog }[name]; return p ? p.st.pose : null; },
 };
 
 async function start() {

@@ -1,5 +1,5 @@
 // main.js — boot, loader, frame loop, scene manager, debug hooks.
-import { L, layout, stageTransform, initInput, clamp, TAU } from './engine.js';
+import { L, layout, stageTransform, initInput, clamp, TAU, unitsToCss } from './engine.js';
 import { loadAssets } from './assets.js';
 import { fx, hint, drawIris } from './fx.js';
 import { bubbles } from './bubbles.js';
@@ -28,7 +28,7 @@ let trans = null; // { k, dir, id, opts }
 let downDelivered = false;
 let bgmStarted = false;
 
-const debug = { get scene() { return game.id; }, get phase() { return game.phase; }, goto: (id) => go(id, { fade: false }), ready: false };
+const debug = { get scene() { return game.id; }, get phase() { return game.phase; }, goto: (id) => go(id, { fade: false }), ready: false, toCss: unitsToCss };
 window.__game = debug;
 
 if (game.params.get('mute') === '1') snd.setMuted(true);
@@ -77,8 +77,8 @@ initInput(canvas, {
     fx.ripple(p.x, p.y);
     snd.sfx('tap', { vol: 0.35 });
     hint.touch();
-    downDelivered = !!(loaded && !trans && !game.block && game.scene && game.scene.down);
-    if (downDelivered) game.scene.down(p);
+    downDelivered = !!(loaded && !trans && !game.block && game.scene);
+    if (downDelivered && game.scene.down) game.scene.down(p);
   },
   move(p) { if (downDelivered && !trans && game.scene && game.scene.move) game.scene.move(p); },
   up(p) {

@@ -1,5 +1,5 @@
 // title — hero curry with rising steam, play button.
-import { L, dist, rnd } from '../engine.js';
+import { L, rnd } from '../engine.js';
 import { cover, vignette } from '../sprite.js';
 import { fx, hint, drawButton } from '../fx.js';
 import { bubbles } from '../bubbles.js';
@@ -32,16 +32,14 @@ export default function title() {
     drawTop(ctx) {
       drawButton(ctx, btn.x, btn.y, btn.r, 'play', t, leaving ? 0 : 1);
     },
-    up(p) {
+    up() {
       if (leaving) return;
       leaving = true;
-      void dist;
       snd.unlock().then(() => { snd.sfx('pop'); game.startBgm(); });
       fx.sparkle(btn.x, btn.y, 12, 80, 'over');
       hint.clear();
       phase('start');
       game.clock.wait(0.25).then(() => game.goto('home'));
-      void p;
     },
   };
 }

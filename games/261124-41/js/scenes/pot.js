@@ -1,5 +1,5 @@
 // pot — light the flame, tip four dishes into the pot, pour water (hold), lid + simmer, lift the lid.
-import { TAU, rnd, ease, Spring, lerp, clamp, dist, minHit } from '../engine.js';
+import { TAU, rnd, ease, Spring, lerp, dist, minHit } from '../engine.js';
 import { spr } from '../sprite.js';
 import { size, geo } from '../assets.js';
 import { fx, hint } from '../fx.js';
@@ -36,7 +36,7 @@ export default function pot() {
   const flying = [];
   let step = 'flame';
   let dishesDone = 0;
-  let held = null, downAt = null;
+  let held = null;
   const loops = {};
   const jug = { x: 1300, y: JUG.y, rot: -0.15, h: 0, vis: false, tilt: 0 };
   let pouring = false, holding = false, pourMin = 0, firstContact = false, pourT = 0;
@@ -144,7 +144,7 @@ export default function pot() {
   async function startPour() {
     if (step !== 'water' || pouring) return;
     pouring = true; holding = true; pourMin = 0.7;
-    hint.progress();
+    hint.clear();
     const p = jugPour(), x0 = jug.x, y0 = jug.y, r0 = jug.rot;
     await anim(0.3, (k) => { jug.x = lerp(x0, p.x, k); jug.y = lerp(y0, p.y, k); jug.rot = lerp(r0, p.rot, k); jug.h = p.h * k; }, ease.outCubic);
     jug.tilt = 1;
@@ -207,7 +207,7 @@ export default function pot() {
     snd.sfx('whoosh', { vol: 0.6 });
     anim(0.6, (k) => { l.h = k * 900; l.x = lerp(pv.g.ix, pv.g.ix - 120, k); l.y = lerp(pv.g.iy, pv.g.iy - 500, k); l.alpha = 1 - Math.max(0, (k - 0.5) * 2); }, ease.inCubic);
     // big steam cloud whites out the screen, then clears to reveal the broth
-    for (let i = 0; i < 36; i++) fx.steam(pv.g.ix + rnd.range(-200, 200), pv.g.iy + rnd.range(-200, 200), { size: rnd.range(160, 260), alpha: 0.9, vy: -60, vx: -30, life: 2.4, grow: 1.4, spread: 60, layer: 'over' });
+    for (let i = 0; i < 16; i++) fx.steam(pv.g.ix + rnd.range(-200, 200), pv.g.iy + rnd.range(-200, 200), { size: rnd.range(200, 320), alpha: 0.9, vy: -60, vx: -30, life: 2.4, grow: 1.4, spread: 60, layer: 'over' });
     await anim(0.35, (k) => { whiteout = k; }, ease.outQuad);
     // the reveal: simmered golden broth, softer pieces
     pv.lid = null; pv.water = 0; pv.broth = 1; pv.jiggle = 0; pv.soft = 1;
@@ -260,7 +260,7 @@ export default function pot() {
               snd.sfx('steam');
               for (let i = 0; i < 12; i++) fx.steam(g.ix + rnd.range(-120, 120), g.iy + rnd.range(-120, 120), { size: 110, alpha: 0.7, life: 2, spread: 40 });
             }
-            const lp = { x: g.ix + g.ir * 0.35, y: g.iy - g.ir * 0.15 };
+            const lp = { x: g.ix + g.ir * 0.12, y: g.iy + g.ir * 0.05 };
             if (rnd() < dt * 10) pv.ripple(lp.x + rnd.range(-10, 10), lp.y + rnd.range(-10, 10), 0.8, 0.9);
             if (rnd() < dt * 12) fx.drops(lp.x, lp.y, 2, 'rgba(225,240,250,0.9)', 160);
             L('sizzle').set(Math.max(0, 1 - pv.water * 1.4), 0.2);
@@ -275,7 +275,7 @@ export default function pot() {
         if (steamT <= 0) {
           steamT = 0.15;
           const a = rnd() * TAU, r = g.ir * 1.12;
-          fx.steam(g.ix + Math.cos(a) * r, g.iy + Math.sin(a) * r, { size: 55, alpha: 0.4 * pv.simmer + 0.1, life: 1.8 });
+          fx.steam(g.ix + Math.cos(a) * r, g.iy + Math.sin(a) * r, { size: 65, alpha: 0.5 * pv.simmer + 0.2, life: 1.8 });
         }
         if (rattleT <= 0 && pv.lid) {
           rattleT = 1.2;
@@ -321,7 +321,6 @@ export default function pot() {
       }
     },
     down(p) {
-      downAt = p;
       if (step === 'dishes') {
         let best = null, bd = 1e9;
         for (const d of dishes) {
@@ -343,10 +342,9 @@ export default function pot() {
         if (dist(held.x, held.y, POT.x, POT.y) < POT.outerR * 0.9) { const d = held; held = null; tip(d); }
       }
     },
-    up(p) {
+    up() {
       holding = false;
       if (held && !held.used) { const d = held; held = null; tip(d); }
-      void p;
     },
   };
 
@@ -356,7 +354,7 @@ export default function pot() {
 
   function drawStream(ctx) {
     const s = spout(), g = pv.g;
-    const lx = g.ix + g.ir * 0.35, ly = g.iy - g.ir * 0.15;
+    const lx = g.ix + g.ir * 0.12, ly = g.iy + g.ir * 0.05;
     const mx = (s.x + lx) / 2 + 20, my = (s.y + ly) / 2 - 10;
     ctx.save();
     ctx.lineCap = 'round';
@@ -378,4 +376,3 @@ export default function pot() {
   }
 }
 
-void clamp;

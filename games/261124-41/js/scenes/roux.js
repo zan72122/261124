@@ -1,7 +1,7 @@
 // roux — break roux blocks into the broth, stir in circles: the golden broth turns into curry.
 // Then the "oishiku naare" video cut-scene grows out of the girl's bubble.
 import { TAU, rnd, ease, lerp, clamp, dist, angDiff, Spring, L as LAY } from '../engine.js';
-import { spr, shadow, rrect } from '../sprite.js';
+import { spr, shadow } from '../sprite.js';
 import { size, geo, img } from '../assets.js';
 import { fx, hint } from '../fx.js';
 import { bubbles } from '../bubbles.js';
@@ -10,13 +10,12 @@ import { game, phase, wait, anim } from '../game.js';
 import { POT, createPot, fillPot, drawStove, drawPot, initMix, mixRotate, mixDeposit, mixRaise, mixFill, mixMeasure } from '../potview.js';
 import { playStirVideo } from '../video.js';
 
-const TRAY = { x: 500, y: 850, w: 230 };
-const DISH_W = 300;
+const TRAY = { x: 500, y: 835, w: 220 };
+const DISH_W = 285;
 // quadrant centres of the roux bar (normalised to the tray image)
 const QUADS = [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]];
 
 export default function roux(carry) {
-  let t = 0;
   const pv = carry && carry.pieces ? carry : createPot();
   const loops = pv.loops || {};
   const L = (name) => loops[name] || (loops[name] = snd.loop(name));
@@ -26,7 +25,8 @@ export default function roux(carry) {
   let taps = 0;
   const spat = { x: 0, y: 0, vis: 0, h: 0 };
   let stirring = false, lastAng = null, lastP = null;
-  let frameDA = 0, frameDist = 0, frameT = 0, measureT = 0, tokT = 0, stirAcc = 0, cut = null;
+  let smSpeed = 0, smTan = 0;
+  let frameDA = 0, frameDist = 0, measureT = 0, tokT = 0, cut = null;
 
   if (!carry || !carry.pieces) {
     fillPot(pv, true);
@@ -161,19 +161,21 @@ export default function roux(carry) {
     const m = pv.mix, g = pv.g;
     if (!m) return;
     // finger motion accumulated since the last frame
-    const speed = frameT > 0 ? frameDist / frameT : 0;
+    // pointer events and frames are not in lock-step: smooth per-frame motion over ~0.15 s
     const r = Math.hypot(spat.x - g.ix, spat.y - g.iy);
-    const tangential = frameT > 0 ? Math.abs(frameDA) * r / frameT : 0;
-    const circ = speed > 1 ? clamp(tangential / speed, 0, 1) : 0;
-    const energy = stirring ? clamp(speed / 700, 0, 1) * (0.5 + 0.5 * circ) : 0;
+    const sm = 1 - Math.exp(-dt / 0.15);
+    smSpeed += (frameDist / dt - smSpeed) * sm;
+    smTan += (Math.abs(frameDA) * r / dt - smTan) * sm;
+    const speed = stirring ? smSpeed : 0;
+    const circ = speed > 1 ? clamp(smTan / speed, 0, 1) : 0;
+    const energy = stirring ? clamp(speed / 450, 0, 1) * (0.5 + 0.5 * circ) : 0;
     if (stirring) {
       const da = clamp(frameDA * 0.55, -0.16, 0.16);
-      if (Math.abs(da) > 0.0005) mixRotate(pv, da * 0.6, 0, 0, r, g.ir * 0.22, da * 0.7);
+      if (Math.abs(da) > 0.0005) mixRotate(pv, da * 0.6, r, g.ir * 0.22, da * 0.7);
       m.texAng += da * 0.5;
       for (const p of pv.pieces) if (p.float) { p.pa += da * 0.8; }
       if (frameDist > 2) mixDeposit(pv, spat.x, spat.y, 36, 0.05 + 0.25 * clamp(blocks.reduce((s, b) => s + b.d, 0) / 4, 0, 1) * energy);
       L('stir').set(clamp(speed / 900, 0.1, 1), 0.08);
-      stirAcc += energy * dt;
     } else {
       L('stir').set(0, 0.25);
     }
@@ -191,7 +193,7 @@ export default function roux(carry) {
       mixDeposit(pv, b.x, b.y, 40 + b.d * 70, (0.06 + energy * 0.12) * (1 - b.d * 0.5));
     }
     // slow uniform thickening proportional to stirring (~9 s of good stirring completes it)
-    mixRaise(pv, energy * 0.105 * dt);
+    mixRaise(pv, energy * 0.12 * dt);
     if (energy > 0.05) hint.progress();
     measureT -= dt;
     if (measureT <= 0) {
@@ -201,7 +203,7 @@ export default function roux(carry) {
       if (step === 'stir' && (mean >= 0.97 || m.base >= 1.02)) complete();
     }
     if (stirring && energy > 0.2 && rnd() < dt * 3) fx.steam(g.ix + rnd.range(-120, 120), g.iy + rnd.range(-120, 120), { size: 50, alpha: 0.3, life: 1.6 });
-    frameDA = 0; frameDist = 0; frameT = 0;
+    frameDA = 0; frameDist = 0;
   }
 
   return {
@@ -213,7 +215,7 @@ export default function roux(carry) {
     },
     exit() { for (const k in loops) loops[k].stop(0.4); },
     update(dt) {
-      t += dt; tokT -= dt;
+      tokT -= dt;
       pv.update(dt);
       for (const b of blocks) b.sq.update(dt);
       for (const p of pv.pieces) if (p.float && p.pa !== undefined) { p.x = pv.g.ix + Math.cos(p.pa) * p.pr; p.y = pv.g.iy + Math.sin(p.pa) * p.pr; }
@@ -276,7 +278,7 @@ export default function roux(carry) {
       const g = pv.g;
       const a = Math.atan2(p.y - g.iy, p.x - g.ix);
       if (lastAng !== null && Math.hypot(p.x - g.ix, p.y - g.iy) > 25) frameDA += angDiff(lastAng, a);
-      if (lastP) { frameDist += dist(p.x, p.y, lastP.x, lastP.y); frameT += Math.max(0, p.t - lastP.t); }
+      if (lastP) frameDist += dist(p.x, p.y, lastP.x, lastP.y);
       lastAng = a; lastP = p;
       moveSpat(p);
     },
@@ -311,6 +313,5 @@ export default function roux(carry) {
       else ctx.drawImage(img('roux_tray'), x0, y0, TRAY.w, h);
       ctx.restore();
     }
-    void rrect;
   }
 }

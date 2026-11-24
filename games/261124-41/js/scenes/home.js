@@ -1,6 +1,6 @@
 // home — Mama comes home tired, the girl has an idea (curry!), vegetables hop out of the basket.
-import { TAU, rnd, ease, Spring, dist, lerp } from '../engine.js';
-import { spr, drawBg, vignette, tint } from '../sprite.js';
+import { TAU, ease, Spring, lerp } from '../engine.js';
+import { spr, backdrop } from '../sprite.js';
 import { geo } from '../assets.js';
 import { fx, hint } from '../fx.js';
 import { bubbles } from '../bubbles.js';
@@ -10,11 +10,10 @@ import { game, phase, wait, anim } from '../game.js';
 const BASKET = { x: 500, y: 540, w: 560 };
 
 export default function home() {
-  let t = 0;
   const basket = { h: 900, vis: 0, sq: new Spring(260, 12) };
   // vegetables lying in the basket (local offsets) and where they land when they hop out
   const veg = [
-    { name: 'carrot', w: 400, lx: -15, ly: -55, rot: -0.35, tx: 500, ty: 905, trot: 0.06 },
+    { name: 'carrot', w: 400, lx: -15, ly: -55, rot: -0.35, tx: 500, ty: 875, trot: 0.06 },
     { name: 'potato', w: 150, lx: -120, ly: 85, rot: 0.5, tx: 135, ty: 600, trot: 0.25 },
     { name: 'potato', w: 140, lx: 25, ly: 120, rot: -1.1, tx: 150, ty: 805, trot: -0.4 },
     { name: 'onion', w: 175, lx: 125, ly: 35, rot: 0.3, tx: 865, ty: 700, trot: 0.2 },
@@ -124,13 +123,11 @@ export default function home() {
       script();
     },
     update(dt) {
-      t += dt;
       basket.sq.update(dt);
       for (const v of veg) v.sq.update(dt);
     },
     draw(ctx) {
-      drawBg(ctx, 'bg_counter', 500, 500, 1600);
-      tint(ctx, 'rgba(255,150,80,0.22)', 'multiply');
+      backdrop(ctx, 'bg_counter', 500, 500, 1600, { tint: 'rgba(255,150,80,0.25)', vig: 0.5 });
       if (basket.vis) {
         const sq = basket.sq.x * 0.03;
         spr(ctx, 'basket', BASKET.x, BASKET.y, BASKET.w, { h: basket.h, sx: 1 + sq, sy: 1 - sq });
@@ -152,19 +149,16 @@ export default function home() {
         if (!v.out || v.flying) continue;
         drawVeg(ctx, v);
       }
-      vignette(ctx, 0.5);
     },
     drawTop(ctx) {
       for (const v of veg) if (v.out && v.flying) drawVeg(ctx, v);
     },
-    down(p) {
+    // any tap makes the next vegetable hop out (forgiving: no need to hit the basket)
+    down() {
       if (!interactive || next >= veg.length) return;
-      void p;
-      void dist;
       const v = veg[next++];
       hop(v);
       if (next >= veg.length) { interactive = false; game.clock.after(0.4, finish); }
-      void rnd;
     },
   };
 }

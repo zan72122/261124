@@ -1,7 +1,6 @@
 // serve — rice from the paddle, curry from the ladle, carrot shapes on top, then "itadakimasu".
-import { TAU, rnd, ease, lerp, dist, minHit, Spring } from '../engine.js';
-import { spr, drawBg, vignette } from '../sprite.js';
-import { size, geo } from '../assets.js';
+import { rnd, ease, lerp, dist, minHit, Spring } from '../engine.js';
+import { spr, backdrop } from '../sprite.js';
 import { fx, hint } from '../fx.js';
 import { bubbles } from '../bubbles.js';
 import { snd } from '../snd.js';
@@ -11,13 +10,14 @@ import { createPlate, drawPlate } from '../plate.js';
 export const PLATE_SERVE = { x: 500, y: 500, w: 640 };
 export const SPOON_REST = { x: 905, y: 540, rot: 0.12, w: 78 };
 export const SHAPES = [
-  { name: 'carrot_flower', dx: -0.02, dy: -0.06, rot: 0.3 },
-  { name: 'carrot_star', dx: 0.09, dy: 0.06, rot: -0.2 },
-  { name: 'carrot_heart', dx: -0.07, dy: 0.1, rot: 0.15 },
+  // placed exactly on the bite spots that will eat them (see eat.js BITES)
+  { name: 'carrot_flower', ax: 0.6, ay: 0.32, rot: 0.3 },
+  { name: 'carrot_star', ax: 0.72, ay: 0.47, rot: -0.2 },
+  { name: 'carrot_heart', ax: 0.63, ay: 0.6, rot: 0.15 },
 ];
 
 export function drawTable(ctx) {
-  drawBg(ctx, 'bg_table', 500, 500, 1500);
+  backdrop(ctx, 'bg_table', 500, 500, 1500, { vig: 0.3 });
 }
 
 export function drawSpoon(ctx, x, y, rot, w, o = {}) {
@@ -25,7 +25,7 @@ export function drawSpoon(ctx, x, y, rot, w, o = {}) {
 }
 
 export default function serve() {
-  let t = 0, steamT = 0, steaming = false;
+  let steamT = 0, steaming = false;
   const plate = createPlate(PLATE_SERVE.x, PLATE_SERVE.y, PLATE_SERVE.w);
   const psq = new Spring(260, 10);
   const tools = {
@@ -84,8 +84,7 @@ export default function serve() {
   async function shapesDrop() {
     phase('toppings');
     for (const s of SHAPES) {
-      const c = plate.pt('curry');
-      const sh = { name: s.name, nx: c.nx + s.dx, ny: c.ny + s.dy, w: 64, rot: s.rot, h: 300, a: 1 };
+      const sh = { name: s.name, nx: s.ax, ny: s.ay, w: 64, rot: s.rot, h: 300, a: 1 };
       plate.shapes.push(sh);
       await anim(0.3, (k) => { sh.h = 300 * (1 - k); }, ease.inQuad);
       sh.h = 0;
@@ -116,7 +115,6 @@ export default function serve() {
       setHint();
     },
     update(dt) {
-      t += dt;
       psq.update(dt); plate.sq = psq.x;
       if (steaming) {
         steamT -= dt;
@@ -128,7 +126,6 @@ export default function serve() {
       drawPlate(ctx, plate);
       drawSpoon(ctx, SPOON_REST.x, SPOON_REST.y, SPOON_REST.rot, SPOON_REST.w);
       for (const k in tools) { const tl = tools[k]; if (tl.h < 40 && tl.a > 0) drawTool(ctx, tl); }
-      vignette(ctx, 0.3);
     },
     drawTop(ctx) { for (const k in tools) { const tl = tools[k]; if (tl.h >= 40 && tl.a > 0) drawTool(ctx, tl); } },
     down(p) {
@@ -157,4 +154,3 @@ function drawTool(ctx, tl) {
   spr(ctx, tl.name, tl.x, tl.y, tl.w, { rot: tl.rot, h: tl.h, alpha: tl.a });
 }
 
-void TAU; void size; void geo;

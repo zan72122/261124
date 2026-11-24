@@ -1,5 +1,5 @@
 // sprite.js — draw photo cut-outs with baked contact shadows; mirrored backgrounds; cover images.
-import { L } from './engine.js';
+import { L, stageTransform } from './engine.js';
 import { img, size, shadowOf } from './assets.js';
 
 // Lifted objects come toward the overhead camera: bigger, shadow further down-right, softer, fainter.
@@ -50,21 +50,63 @@ export function shadow(ctx, name, x, y, w, hh, h, rot, sx, sy, ax, ay, a) {
 }
 
 // Background image of side S units centred at (cx,cy); the rest of the screen is filled by mirrored copies.
-export function drawBg(ctx, name, cx, cy, S) {
+// crop (0..1 of the image, from the top-left corner) lets a background with a central feature
+// (the stove burner) extend using only its plain border area.
+export function drawBg(ctx, name, cx, cy, S, crop = 0) {
   const im = img(name);
+  const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
+  const T = crop ? S * crop : S;
   const x0 = cx - S / 2, y0 = cy - S / 2;
-  const i0 = Math.floor((L.ex0 - x0) / S), i1 = Math.floor((L.ex1 - x0) / S);
-  const j0 = Math.floor((L.ey0 - y0) / S), j1 = Math.floor((L.ey1 - y0) / S);
+  const i0 = Math.floor((L.ex0 - x0) / T), i1 = Math.floor((L.ex1 - x0) / T);
+  const j0 = Math.floor((L.ey0 - y0) / T), j1 = Math.floor((L.ey1 - y0) / T);
   for (let j = j0; j <= j1; j++) {
     for (let i = i0; i <= i1; i++) {
       ctx.save();
-      ctx.translate(x0 + i * S, y0 + j * S);
-      if (i & 1) { ctx.translate(S, 0); ctx.scale(-1, 1); }
-      if (j & 1) { ctx.translate(0, S); ctx.scale(1, -1); }
-      ctx.drawImage(im, -0.5, -0.5, S + 1, S + 1);
+      ctx.translate(x0 + i * T, y0 + j * T);
+      if (i & 1) { ctx.translate(T, 0); ctx.scale(-1, 1); }
+      if (j & 1) { ctx.translate(0, T); ctx.scale(1, -1); }
+      if (crop) ctx.drawImage(im, 0, 0, iw * crop, ih * crop, -0.5, -0.5, T + 1, T + 1);
+      else ctx.drawImage(im, -0.5, -0.5, S + 1, S + 1);
       ctx.restore();
     }
   }
+  if (crop) ctx.drawImage(feathered(name), x0, y0, S, S);
+}
+
+// the image with its border faded out radially, so it blends into the cropped fill
+const feath = {};
+function feathered(name) {
+  if (feath[name]) return feath[name];
+  const im = img(name), N = 768;
+  const c = document.createElement('canvas');
+  c.width = c.height = N;
+  const x = c.getContext('2d');
+  x.drawImage(im, 0, 0, N, N);
+  x.globalCompositeOperation = 'destination-in';
+  const g = x.createRadialGradient(N / 2, N / 2, N * 0.3, N / 2, N / 2, N * 0.5);
+  g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = g; x.fillRect(0, 0, N, N);
+  return (feath[name] = c);
+}
+
+// Background + grade + vignette rendered once per layout into one screen-sized canvas.
+let bgCache = null, bgKey = '';
+export function backdrop(ctx, name, cx, cy, S, o = {}) {
+  const key = [name, cx, cy, S, o.crop, o.vig, o.tint, L.W, L.H, L.dpr].join('|');
+  if (!bgCache) bgCache = document.createElement('canvas');
+  if (key !== bgKey) {
+    bgCache.width = Math.round(L.W * L.dpr); bgCache.height = Math.round(L.H * L.dpr);
+    const c = bgCache.getContext('2d');
+    stageTransform(c);
+    drawBg(c, name, cx, cy, S, o.crop || 0);
+    if (o.tint) tint(c, o.tint, o.tintOp || 'multiply');
+    vignette(c, o.vig ?? 0.35, o.vx ?? cx, o.vy ?? cy);
+    bgKey = key;
+  }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(bgCache, 0, 0);
+  ctx.restore();
 }
 
 export function vignette(ctx, strength = 0.4, cx = 500, cy = 500) {

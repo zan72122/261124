@@ -1,6 +1,6 @@
 // cut — tap anywhere: the helper knife chops carrot, potato, onion; slices become pieces in neat piles.
 import { TAU, rnd, ease, Spring, lerp, clamp } from '../engine.js';
-import { spr, shadow, drawBg, vignette } from '../sprite.js';
+import { spr, shadow, backdrop } from '../sprite.js';
 import { size, geo } from '../assets.js';
 import { fx, hint } from '../fx.js';
 import { bubbles } from '../bubbles.js';
@@ -69,10 +69,9 @@ export default function cut() {
   function knifeAt(x, a) {
     // place the knife so the cutting edge (30% from the tip) is on the cut line at the veg axis
     const ks = size('knife'), kw = 620, kh = kw * ks.h / ks.w;
-    const tip = geo('knife', 'tip', { x: 0.01, y: 0.5 });
-    const edge = geo('knife', 'edge', { y: 0.92 });
-    const ey = edge.y ?? edge.y1 ?? 0.92;
-    const ox = (tip.x + 0.3 - 0.5) * kw, oy = (ey - 0.5) * kh;
+    // contact point: 60% of the way along the cutting edge from the tip toward the heel
+    const e = geo('knife', 'edge', { x0: 0.005, y0: 0.31, x1: 0.56, y1: 0.9 });
+    const ox = (lerp(e.x0, e.x1, 0.6) - 0.5) * kw, oy = (lerp(e.y0, e.y1, 0.6) - 0.5) * kh;
     const th = Math.PI / 2 - a;
     const c = Math.cos(th), s = Math.sin(th);
     return { x: x - (ox * c - oy * s), y: VY - (ox * s + oy * c), rot: th, kw };
@@ -220,7 +219,7 @@ export default function cut() {
       for (const s of segs) s.sq.update(dt);
     },
     draw(ctx) {
-      drawBg(ctx, 'bg_counter', 500, 500, 1600);
+      backdrop(ctx, 'bg_counter', 500, 500, 1600);
       const by = board.sh.x * 0.05;
       ctx.save();
       ctx.translate(0, by);
@@ -231,7 +230,6 @@ export default function cut() {
       }
       drawVeg(ctx);
       ctx.restore();
-      vignette(ctx, 0.35);
     },
     drawTop(ctx) {
       // knife (with its lifted shadow), bobbing gently while it waits

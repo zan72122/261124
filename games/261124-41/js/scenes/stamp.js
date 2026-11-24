@@ -1,7 +1,6 @@
 // stamp — a steel cookie cutter presses carrot rounds into flowers, a star and a heart.
 import { TAU, rnd, ease, Spring, lerp, dist, minHit } from '../engine.js';
-import { spr, drawBg, vignette } from '../sprite.js';
-import { img } from '../assets.js';
+import { spr, backdrop } from '../sprite.js';
 import { shapePath } from '../shapes.js';
 import { fx, hint } from '../fx.js';
 import { bubbles } from '../bubbles.js';
@@ -109,7 +108,7 @@ export default function stamp() {
       }
     },
     draw(ctx) {
-      drawBg(ctx, 'bg_counter', 500, 500, 1600);
+      backdrop(ctx, 'bg_counter', 500, 500, 1600);
       spr(ctx, 'board', BOARD.x, BOARD.y, BOARD.w);
       for (const r of rounds) {
         const q = r.sq.x * 0.04;
@@ -127,7 +126,6 @@ export default function stamp() {
         const pop = 1 + q * 1.5;
         spr(ctx, r.shape.name, r.x, r.y, R * 2.05, { sx: pop, sy: pop, h: Math.max(0, r.sq.x * 6) });
       }
-      vignette(ctx, 0.35);
     },
     drawTop(ctx) {
       if (count < ORDER.length || cutter.y < 1100) drawCutter(ctx, cutter.kind, cutter.x, cutter.y, R, cutter.h + (busy ? 0 : Math.sin(t * 3) * 8));
@@ -145,4 +143,3 @@ export default function stamp() {
   };
 }
 
-void img;

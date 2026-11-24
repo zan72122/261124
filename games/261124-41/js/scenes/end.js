@@ -1,6 +1,6 @@
 // end — snuggle, a red hanamaru over the clean plate, fanfare, (story illustration), replay.
-import { TAU, rnd, ease, lerp, canvas2d, dist, L } from '../engine.js';
-import { vignette, cover, rrect } from '../sprite.js';
+import { TAU, rnd, ease, lerp, canvas2d, L } from '../engine.js';
+import { cover, rrect } from '../sprite.js';
 import { has } from '../assets.js';
 import { fx, drawButton } from '../fx.js';
 import { bubbles } from '../bubbles.js';
@@ -55,7 +55,7 @@ export default function end(carry) {
   let t = 0, fanT = -1, steamT = 0;
   const plate = carry && carry.plate ? carry.plate : createPlate(PLATE_EAT.x, PLATE_EAT.y, PLATE_EAT.w);
   plate.state = 'empty'; plate.eaten = null; plate.shapes = [];
-  const pts = hanamaruPts(plate.w * 0.36);
+  const pts = hanamaruPts(520 * 0.36);
   const H = canvas2d(HS, HS);
   const G = grain();
   let hk = 0, drawnK = -1;
@@ -91,7 +91,9 @@ export default function end(carry) {
     m.place({ x: 500 - D / 2, y: 195, d: D }, 1.1);
     g.place({ x: 500 + D / 2, y: 195, d: D }, 1.1);
     m.setFace('mama_laugh'); g.setFace('girl_happy');
-    await wait(1.1);
+    // plate settles a little smaller to leave room for the replay button below it
+    const x0 = plate.x, y0 = plate.y, w0 = plate.w;
+    await anim(1.1, (k) => { plate.x = lerp(x0, 500, k); plate.y = lerp(y0, 600, k); plate.w = lerp(w0, 520, k); }, ease.inOutCubic);
     m.rk.kick(-3); g.rk.kick(3);
     m.rockAmp = 0.05; g.rockAmp = -0.05;
     snd.sfx('heart');
@@ -158,7 +160,6 @@ export default function end(carry) {
         ctx.drawImage(H, plate.x - EXT, plate.y - EXT, EXT * 2, EXT * 2);
         ctx.globalAlpha = 1;
       }
-      vignette(ctx, 0.3);
     },
     drawOverlay(ctx) {
       if (hug > 0) {
@@ -177,17 +178,15 @@ export default function end(carry) {
         if (rnd() < 0.05) fx.hearts(rnd.range(L.ex0 + 80, L.ex1 - 80), L.ey1 - rnd.range(60, 300), 1, 'over', 1.4);
         fx.drawParts(ctx, 'over');
       }
-      if (replay > 0) drawButton(ctx, 500, 880, 95, 'replay', t, replay);
+      if (replay > 0) drawButton(ctx, 500, 925, 70, 'replay', t, replay);
     },
-    down(p) {
+    down() {
       if (!replayOn) return;
       // any tap restarts; the button is just the visual cue
       replayOn = false;
       snd.sfx('pop');
       game.goto('home');
-      void p; void dist;
     },
   };
 }
 
-void lerp; void vignette;

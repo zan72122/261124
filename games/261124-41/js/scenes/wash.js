@@ -1,6 +1,6 @@
 // wash — rub the mud off the carrot and a potato in a bowl of living water.
 import { TAU, rnd, ease, Spring, clamp, lerp, dist, canvas2d } from '../engine.js';
-import { spr, drawBg, vignette } from '../sprite.js';
+import { spr, backdrop } from '../sprite.js';
 import { img, size, geo } from '../assets.js';
 import { fx, hint, softBlob } from '../fx.js';
 import { bubbles } from '../bubbles.js';
@@ -48,7 +48,7 @@ export default function wash() {
   const inner = () => {
     const g = geo('bowl_water', 'inner', { cx: 0.5, cy: 0.5, r: 0.4 });
     const bh = BOWL.w * size('bowl_water').h / size('bowl_water').w;
-    return { x: BOWL.x + (g.cx - 0.5) * BOWL.w, y: BOWL.y + (g.cy - 0.5) * bh, r: g.r * BOWL.w };
+    return { x: BOWL.x + (g.cx - 0.5) * BOWL.w, y: BOWL.y + (g.cy - 0.5) * bh, r: g.r * BOWL.w * 0.84 };  // water line sits a little below the rim
   };
 
   function measure() {
@@ -197,22 +197,25 @@ export default function wash() {
       }
     },
     draw(ctx) {
-      drawBg(ctx, 'bg_counter', 500, 500, 1600);
+      backdrop(ctx, 'bg_counter', 500, 500, 1600);
       spr(ctx, 'bowl_water', BOWL.x, BOWL.y, BOWL.w, { sa: 1 });
       const c = inner();
       ctx.save();
       ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, TAU); ctx.clip();
       // water body: cool translucent fill + faint mud tint picked up from washing
-      ctx.fillStyle = 'rgba(150,200,225,0.16)'; ctx.fillRect(c.x - c.r, c.y - c.r, c.r * 2, c.r * 2);
+      const wg = ctx.createRadialGradient(c.x - c.r * 0.3, c.y - c.r * 0.3, c.r * 0.1, c.x, c.y, c.r);
+      wg.addColorStop(0, 'rgba(170,215,235,0.28)'); wg.addColorStop(1, 'rgba(90,150,190,0.42)');
+      ctx.fillStyle = wg; ctx.fillRect(c.x - c.r, c.y - c.r, c.r * 2, c.r * 2);
       if (water.tint > 0) { ctx.fillStyle = `rgba(140,100,55,${0.16 * water.tint})`; ctx.fillRect(c.x - c.r, c.y - c.r, c.r * 2, c.r * 2); }
       if (cur) drawItem(ctx, cur);
       drawWater(ctx, c, t, water);
       ctx.restore();
-      // rim highlight over the water edge
-      ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.arc(c.x, c.y, c.r - 3, Math.PI * 0.9, Math.PI * 1.6); ctx.stroke();
+      // meniscus: bright water line against the bowl wall
+      ctx.strokeStyle = 'rgba(235,248,255,0.55)'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(c.x, c.y, c.r - 2, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.arc(c.x, c.y, c.r - 8, Math.PI * 0.95, Math.PI * 1.55); ctx.stroke();
       for (const v of done) drawItem(ctx, v);
-      vignette(ctx, 0.35);
     },
     drawTop(ctx) { if (cur && cur.h > 40) drawItem(ctx, cur); },
     down(p) { lastP = null; this.move(p, true); },

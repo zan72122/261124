@@ -31,7 +31,12 @@ function entriesOf(m) {
   let src = m.images || m.assets || m.sprites || m.files || m;
   const out = {};
   if (Array.isArray(src)) {
-    for (const e of src) if (e && (e.name || e.id)) out[e.name || e.id] = e;
+    for (const e of src) {
+      if (!e) continue;
+      const f = e.file || e.src || e.path || '';
+      const n = e.name || e.id || String(f).split('/').pop().replace(/\.[a-z0-9]+$/i, '');
+      if (n) out[n] = e;
+    }
   } else {
     for (const k in src) {
       const e = src[k];
@@ -151,11 +156,15 @@ const XK = new Set(['x', 'cx', 'x0', 'x1', 'left', 'right', 'w', 'width', 'r', '
 const YK = new Set(['y', 'cy', 'y0', 'y1', 'top', 'bottom', 'h', 'height', 'ry']);
 export function geo(n, key, def) {
   const m = meta[n] || {};
-  let g = m[key];
+  // '_self': geometry stored at the top level of the entry (e.g. lid cx/cy/r)
+  let g = key === '_self' ? (m.cx != null ? { cx: m.cx, cy: m.cy, r: m.r } : null) : m[key];
   if (g == null) return def;
   const { w, h } = size(n);
   const mw = m.w || m.width || w, mh = m.h || m.height || h;
-  if (Array.isArray(g)) {
+  if (Array.isArray(g) && g.length === 2 && typeof g[0] === 'object') {
+    // a segment given as two points
+    g = { x0: g[0].x, y0: g[0].y, x1: g[1].x, y1: g[1].y };
+  } else if (Array.isArray(g)) {
     if (g.length === 2) g = { x: g[0], y: g[1] };
     else if (g.length === 3) g = { cx: g[0], cy: g[1], r: g[2] };
     else if (g.length === 4) g = { x0: g[0], y0: g[1], x1: g[2], y1: g[3] };

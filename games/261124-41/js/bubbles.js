@@ -137,7 +137,6 @@ const thought = {
     let cx = from.x - d * 0.95, cy = from.y + d * 0.9;
     const R = d * 0.62;
     cx = clamp(cx, L.ex0 + R * 1.4, L.ex1 - R * 1.4); cy = clamp(cy, L.ey0 + R * 1.4, L.ey1 - R * 1.4);
-    const k = this.target ? ease.outBack(this.vis) : this.vis;
     // trailing dots
     for (let i = 0; i < 3; i++) {
       const tt = (i + 1) / 4;
@@ -164,7 +163,6 @@ const thought = {
     ctx.drawImage(img(this.name), -s.w * z / 2, -s.h * z / 2, s.w * z, s.h * z);
     ctx.restore();
     ctx.restore();
-    void k;
   },
 };
 

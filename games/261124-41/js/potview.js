@@ -1,7 +1,7 @@
 // potview.js — the stove + pot seen from above, shared by the pot and roux scenes:
 // flames, pieces lying in the pot, water, golden broth, the curry "mix" transformation, the lid.
-import { TAU, rnd, clamp, lerp, Spring, canvas2d, ease } from './engine.js';
-import { spr, drawBg, vignette, tint } from './sprite.js';
+import { TAU, rnd, clamp, Spring, canvas2d, ease } from './engine.js';
+import { spr, backdrop, tint } from './sprite.js';
 import { img, size, geo } from './assets.js';
 import { softBlob } from './fx.js';
 
@@ -75,10 +75,25 @@ export function potSpots(pv, n) {
 export function drawStove(ctx, pv) {
   const b = geo('bg_stove', 'burner', { cx: 0.5, cy: 0.5, r: 0.2 });
   const S = clamp((POT.outerR * 1.02) / b.r, 1300, 2200);
-  drawBg(ctx, 'bg_stove', POT.x - (b.cx - 0.5) * S, POT.y - (b.cy - 0.5) * S, S);
-  if (pv.warm > 0) tint(ctx, `rgba(255,150,60,${0.1 * pv.warm})`, 'soft-light');
-  vignette(ctx, 0.45, POT.x, POT.y);
+  backdrop(ctx, 'bg_stove', POT.x - (b.cx - 0.5) * S, POT.y - (b.cy - 0.5) * S, S, { crop: 0.25, vig: 0.45, vx: POT.x, vy: POT.y });
+  if (pv.warm > 0) tint(ctx, `rgba(255,140,50,${0.06 * pv.warm})`);
   drawFlames(ctx, pv);
+}
+
+// one pre-rendered blue flame petal (base at the bottom), drawn rotated around the pot
+let PETAL = null;
+function petal() {
+  if (PETAL) return PETAL;
+  PETAL = canvas2d(32, 128);
+  const x = PETAL.getContext('2d');
+  const g = x.createLinearGradient(0, 128, 0, 0);
+  g.addColorStop(0, 'rgba(150,200,255,0.95)'); g.addColorStop(0.2, 'rgba(80,130,255,0.85)');
+  g.addColorStop(0.6, 'rgba(50,80,255,0.45)'); g.addColorStop(1, 'rgba(40,60,255,0)');
+  x.fillStyle = g;
+  x.beginPath(); x.moveTo(3, 124); x.quadraticCurveTo(0, 50, 16, 0); x.quadraticCurveTo(32, 50, 29, 124); x.closePath(); x.fill();
+  x.fillStyle = 'rgba(220,235,255,0.5)';
+  x.beginPath(); x.ellipse(16, 112, 6, 10, 0, 0, TAU); x.fill();
+  return PETAL;
 }
 
 function drawFlames(ctx, pv) {
@@ -90,25 +105,16 @@ function drawFlames(ctx, pv) {
   glow.addColorStop(0, `rgba(60,120,255,${0.35 * f})`); glow.addColorStop(1, 'rgba(40,80,255,0)');
   ctx.fillStyle = glow;
   ctx.beginPath(); ctx.arc(POT.x, POT.y, R * 1.35, 0, TAU); ctx.fill();
-  const N = 28;
+  const N = 28, P = petal();
   for (let i = 0; i < N; i++) {
     const a = (i / N) * TAU + 0.05 * Math.sin(t * 3 + i);
-    const L = f * (24 + 9 * Math.sin(t * 17 + i * 2.3) + 6 * Math.sin(t * 29 + i * 5.1));
+    const len = f * (34 + 9 * Math.sin(t * 17 + i * 2.3) + 6 * Math.sin(t * 29 + i * 5.1));
     const r0 = R - 10;
-    const bx = POT.x + Math.cos(a) * r0, by = POT.y + Math.sin(a) * r0;
-    const tx = POT.x + Math.cos(a) * (r0 + L + 10), ty = POT.y + Math.sin(a) * (r0 + L + 10);
-    const gr = ctx.createLinearGradient(bx, by, tx, ty);
-    gr.addColorStop(0, 'rgba(120,180,255,0.95)'); gr.addColorStop(0.45, 'rgba(60,110,255,0.6)'); gr.addColorStop(1, 'rgba(40,60,255,0)');
-    ctx.fillStyle = gr;
-    const nx = -Math.sin(a) * 9, ny = Math.cos(a) * 9;
-    ctx.beginPath();
-    ctx.moveTo(bx + nx, by + ny);
-    ctx.quadraticCurveTo(bx + nx + (tx - bx) * 0.5, by + ny + (ty - by) * 0.5, tx, ty);
-    ctx.quadraticCurveTo(bx - nx + (tx - bx) * 0.5, by - ny + (ty - by) * 0.5, bx - nx, by - ny);
-    ctx.closePath(); ctx.fill();
-    // white-violet core
-    ctx.fillStyle = 'rgba(200,220,255,0.35)';
-    ctx.beginPath(); ctx.arc(bx + (tx - bx) * 0.2, by + (ty - by) * 0.2, 4, 0, TAU); ctx.fill();
+    ctx.save();
+    ctx.translate(POT.x + Math.cos(a) * r0, POT.y + Math.sin(a) * r0);
+    ctx.rotate(a + Math.PI / 2);
+    ctx.drawImage(P, -10, -len, 20, len + 6);
+    ctx.restore();
   }
   ctx.restore();
 }
@@ -216,7 +222,7 @@ function drawSurface(ctx, pv) {
 
 function drawLid(ctx, pv) {
   const l = pv.lid, g = pv.g;
-  const lg = geo('lid', 'lid', geo('lid', 'circle', { cx: 0.5, cy: 0.5, r: 0.49 }));
+  const lg = geo('lid', '_self', { cx: 0.5, cy: 0.5, r: 0.49 });
   const r = l.r || g.ir * 1.13;
   const w = r / (lg.r || 0.49);
   const q = l.sq ? l.sq.x * 0.04 : 0;
@@ -232,7 +238,7 @@ export function initMix(pv) {
 // stage coords -> mask pixel coords
 function toM(pv, x, y) { const g = pv.g; return { x: ((x - g.ix) / (g.ir * 2) + 0.5) * MS, y: ((y - g.iy) / (g.ir * 2) + 0.5) * MS }; }
 
-export function mixRotate(pv, ang, cx, cy, ringR, ringW, ringAng) {
+export function mixRotate(pv, ang, ringR, ringW, ringAng) {
   const m = pv.mix, mx = m.M.getContext('2d'), tx = m.T.getContext('2d');
   tx.clearRect(0, 0, MS, MS);
   tx.drawImage(m.M, 0, 0);
@@ -253,7 +259,6 @@ export function mixRotate(pv, ang, cx, cy, ringR, ringW, ringAng) {
     mx.drawImage(m.T, 0, 0);
     mx.restore();
   }
-  void cx; void cy;
 }
 
 export function mixDeposit(pv, x, y, r, a) {
@@ -304,6 +309,7 @@ function drawMix(ctx, pv) {
   cx.save();
   cx.clearRect(0, 0, CS, CS);
   cx.translate(CS / 2, CS / 2); cx.rotate(m.texAng);
+  // one texture drawn large enough to cover the mask at any rotation (mirrored tiling showed kaleidoscope seams)
   const D = CS * 1.45;
   cx.drawImage(img('tex_curry'), -D / 2, -D / 2, D, D);
   cx.restore();
@@ -337,4 +343,3 @@ function drawMix(ctx, pv) {
   }
 }
 
-export { lerp };

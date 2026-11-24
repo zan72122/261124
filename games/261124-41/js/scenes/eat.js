@@ -1,6 +1,6 @@
 // eat — six spoonfuls, Mama and the girl in turns; Mama's first bite is the emotional peak.
 import { TAU, rnd, ease, lerp, Spring } from '../engine.js';
-import { spr, vignette } from '../sprite.js';
+import { spr } from '../sprite.js';
 import { img, size, geo } from '../assets.js';
 import { fx, hint } from '../fx.js';
 import { bubbles } from '../bubbles.js';
@@ -15,27 +15,26 @@ export const SEATS = { mama: { x: 150, y: 150, d: 270 }, girl: { x: 850, y: 150,
 
 // bite spots (normalised plate coords); the topping eaten with that bite
 const BITES = [
-  { who: 'mama', nx: 0.52, ny: 0.5, food: 'mix' },
-  { who: 'girl', nx: 0.34, ny: 0.62, food: 'tex_rice' },
-  { who: 'mama', nx: 0.62, ny: 0.36, food: 'tex_curry', top: 'carrot_flower' },
-  { who: 'girl', nx: 0.7, ny: 0.5, food: 'tex_curry', top: 'carrot_star' },
-  { who: 'mama', nx: 0.45, ny: 0.72, food: 'mix', top: 'carrot_heart' },
-  { who: 'girl', nx: 0.5, ny: 0.5, food: 'tex_rice', last: true },
+  { who: 'mama', nx: 0.45, ny: 0.45, food: 'mix' },
+  { who: 'girl', nx: 0.32, ny: 0.66, food: 'tex_rice' },
+  { who: 'mama', nx: 0.6, ny: 0.32, food: 'tex_curry', top: 'carrot_flower' },
+  { who: 'girl', nx: 0.72, ny: 0.47, food: 'tex_curry', top: 'carrot_star' },
+  { who: 'mama', nx: 0.63, ny: 0.6, food: 'mix', top: 'carrot_heart' },
+  { who: 'girl', nx: 0.42, ny: 0.74, food: 'tex_rice', last: true },
 ];
 
 export function setupPlate(carry) {
   if (carry && carry.plate) return carry.plate;
   const p = createPlate(PLATE_EAT.x, PLATE_EAT.y, PLATE_EAT.w);
   p.state = 'full';
-  const c = p.pt('curry');
-  for (const s of SHAPES) p.shapes.push({ name: s.name, nx: c.nx + s.dx, ny: c.ny + s.dy, w: 64, rot: s.rot, h: 0, a: 1 });
+  for (const s of SHAPES) p.shapes.push({ name: s.name, nx: s.ax, ny: s.ay, w: 64, rot: s.rot, h: 0, a: 1 });
   return p;
 }
 
 export default function eat(carry) {
-  let t = 0, steamT = 0;
+  let steamT = 0;
   const plate = setupPlate(carry);
-  const spoon = { x: SPOON_REST.x, y: SPOON_REST.y, rot: SPOON_REST.rot, w: SPOON_REST.w, h: 0, a: 1, heap: null, top: null, sc: 1, flying: false };
+  const spoon = { x: 0, y: 0, rot: SPOON_REST.rot, w: SPOON_REST.w, h: 0, a: 1, heap: null, top: null, sc: 1, flying: false };
   let n = 0, busy = true;
   const psq = new Spring(260, 10);
   let food = 1;
@@ -50,16 +49,20 @@ export default function eat(carry) {
     return { x: (ox * c - oy * sn) * k, y: (ox * sn + oy * c) * k, H };
   }
 
+  // rest positions are sprite centres; spoon.x/y is the bowl
+  function restHead(b) { const o = headOffset(b.rot, b.w, 0); return { x: b.x + o.x, y: b.y + o.y }; }
+  Object.assign(spoon, restHead(SPOON_REST));
+
   async function enter() {
     game.block = true;
     phase('eat-setup');
     const m = bubbles.mama, g = bubbles.girl;
     m.place(SEATS.mama, 0.9); g.place(SEATS.girl, 0.9);
     const x0 = plate.x, y0 = plate.y, w0 = plate.w;
-    const s0 = { x: spoon.x, y: spoon.y };
+    const s0 = { x: spoon.x, y: spoon.y }, s1 = restHead(SPOON_EAT);
     await anim(0.9, (k) => {
       plate.x = lerp(x0, PLATE_EAT.x, k); plate.y = lerp(y0, PLATE_EAT.y, k); plate.w = lerp(w0, PLATE_EAT.w, k);
-      spoon.x = lerp(s0.x, SPOON_EAT.x, k); spoon.y = lerp(s0.y, SPOON_EAT.y, k);
+      spoon.x = lerp(s0.x, s1.x, k); spoon.y = lerp(s0.y, s1.y, k);
     }, ease.inOutCubic);
     startEating(plate);
     turn();
@@ -89,8 +92,6 @@ export default function eat(carry) {
     const x0 = spoon.x, y0 = spoon.y, r0 = spoon.rot;
     const dipRot = -0.5;
     await anim(0.35, (k) => {
-      const o = headOffset(lerp(r0, dipRot, k), spoon.w, spoon.h);
-      void o;
       spoon.x = lerp(x0, tx, k); spoon.y = lerp(y0, ty, k); spoon.rot = lerp(r0, dipRot, k);
       spoon.h = Math.sin(k * Math.PI) * 120 + 20 * k;
     }, ease.inOutCubic);
@@ -106,7 +107,6 @@ export default function eat(carry) {
     spoon.heap = b.food; spoon.top = b.top || null;
     fx.specks(tx, ty, 4, 'rgba(160,90,30,0.7)', 120, 4);
     // up to the eater
-    const p = who.pos();
     const x1 = spoon.x, y1 = spoon.y, r1 = spoon.rot;
     const toRot = b.who === 'mama' ? -0.9 : 0.6;
     await anim(0.55, (k) => {
@@ -114,7 +114,6 @@ export default function eat(carry) {
       spoon.x = lerp(x1, q.x + (b.who === 'mama' ? 40 : -40), k); spoon.y = lerp(y1, q.y + q.d * 0.35, k);
       spoon.rot = lerp(r1, toRot, k); spoon.h = Math.sin(k * Math.PI) * 200 + k * 60;
     }, ease.inOutCubic);
-    void p;
     // into the mouth
     await anim(0.18, (k) => { spoon.sc = 1 - k * 0.6; spoon.a = 1 - k; }, ease.inQuad);
     spoon.heap = null; spoon.top = null;
@@ -151,7 +150,7 @@ export default function eat(carry) {
       await wait(0.6);
     }
     // spoon reappears at rest
-    spoon.x = SPOON_EAT.x; spoon.y = SPOON_EAT.y; spoon.rot = SPOON_EAT.rot; spoon.h = 0; spoon.sc = 1; spoon.flying = false;
+    Object.assign(spoon, restHead(SPOON_EAT)); spoon.rot = SPOON_EAT.rot; spoon.h = 0; spoon.sc = 1; spoon.flying = false;
     anim(0.3, (k) => { spoon.a = k; });
     n++;
     if (n < BITES.length) { await wait(0.3); turn(); }
@@ -175,8 +174,6 @@ export default function eat(carry) {
     if (spoon.a <= 0.01) return;
     const o = headOffset(spoon.rot, spoon.w * spoon.sc, spoon.h);
     // spoon anchored so the head sits at spoon.x/y
-    const s = size('spoon');
-    const hd = geo('spoon', 'head', { x: 0.5, y: 0.14 });
     spr(ctx, 'spoon', spoon.x - o.x, spoon.y - o.y, spoon.w * spoon.sc, { rot: spoon.rot, h: spoon.h, alpha: spoon.a });
     if (spoon.heap) {
       const k = (1 + spoon.h / 1400) * spoon.sc;
@@ -195,7 +192,6 @@ export default function eat(carry) {
       ctx.restore();
       if (spoon.top) spr(ctx, spoon.top, spoon.x, spoon.y, 48 * k, { rot: spoon.rot, alpha: spoon.a, sa: 0.6 });
     }
-    void s; void hd;
   }
 
   return {
@@ -205,7 +201,6 @@ export default function eat(carry) {
       enter();
     },
     update(dt) {
-      t += dt;
       psq.update(dt); plate.sq = psq.x;
       steamT -= dt;
       if (steamT <= 0 && food > 0.2) { steamT = 0.3; fx.steam(plate.x + rnd.range(-120, 120), plate.y + rnd.range(-90, 90), { size: 45, alpha: 0.28 * food, life: 2 }); }
@@ -214,7 +209,6 @@ export default function eat(carry) {
       drawTable(ctx);
       drawPlate(ctx, plate);
       if (!spoon.flying) drawSpoonNow(ctx);
-      vignette(ctx, 0.3);
     },
     drawOverlay(ctx) { if (spoon.flying) drawSpoonNow(ctx); },
     down() { if (!busy) doBite(); },

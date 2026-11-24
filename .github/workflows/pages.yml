@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url || steps.deployment1.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - name: Refuse if games disappeared
@@ -29,11 +29,5 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
-      - id: deployment1
-        continue-on-error: true
-        uses: actions/deploy-pages@v4
-      - if: steps.deployment1.outcome == 'failure'
-        run: sleep 45
       - id: deployment
-        if: steps.deployment1.outcome == 'failure'
         uses: actions/deploy-pages@v4

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#ffc6e2">
+<title>ピンクのアイスクリームトラック</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #ffd9ec; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #fade { position: fixed; inset: 0; background: #fff4fa; opacity: 1; pointer-events: none; transition: opacity .6s; }
+  #ripple { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .rip { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%;
+    border: 4px solid rgba(255,120,190,.85); animation: rip .55s ease-out forwards; }
+  @keyframes rip { to { transform: scale(4); opacity: 0; } }
+  #hint { position: fixed; left: 0; top: 0; width: 64px; height: 64px; pointer-events: none; opacity: 0; transition: opacity .3s;
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,.3)); }
+  #start { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 45%, #fff 0%, #ffd3ea 55%, #ff9fcf 100%); }
+  #start button { width: 170px; height: 170px; border-radius: 50%; border: 0; background: radial-gradient(circle at 35% 30%, #ffb8dc, #ff5fae 70%);
+    box-shadow: 0 10px 0 #d93d8a, 0 18px 30px rgba(180,40,110,.35); animation: bob 1.4s ease-in-out infinite; cursor: pointer; padding: 0; }
+  #start button:active { transform: translateY(8px); box-shadow: 0 2px 0 #d93d8a; }
+  #start svg { width: 100%; height: 100%; }
+  @keyframes bob { 50% { transform: translateY(-10px) scale(1.04); } }
+  #pal { position: fixed; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: none; gap: 10px;
+    padding: 10px 14px; border-radius: 40px; background: rgba(255,255,255,.75); box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+  #pal .b { width: 52px; height: 52px; border-radius: 16px; border: 4px solid #fff; box-shadow: 0 3px 0 rgba(0,0,0,.15); background-size: cover; flex: none;
+    transition: transform .15s; display: flex; align-items: center; justify-content: center; }
+  #pal .b.on { transform: translateY(-10px) scale(1.12); border-color: #ff5fae; }
+  @media (max-width: 480px) { #pal { gap: 6px; padding: 8px 10px; } #pal .b { width: 40px; height: 40px; border-radius: 12px; border-width: 3px; } }
+</style>
+
+<script src="/gf-nav.js" defer></script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ripple"></div>
+<svg id="hint" viewBox="0 0 64 64"><g transform="rotate(-20 32 32)">
+  <path d="M26 6c3 0 5 2 5 5v18l3-1c2-1 5 0 6 2l1 1c2-1 5 0 6 2 2-1 5 0 6 3v12c0 9-6 15-15 15h-3c-6 0-10-3-13-8L12 41c-2-3 1-7 5-5l4 3V11c0-3 2-5 5-5z" fill="#fff" stroke="#ff5fae" stroke-width="3.5" stroke-linejoin="round"/>
+</g></svg>
+<div id="pal"></div>
+<div id="fade"></div>
+<div id="start"><button aria-label="play"><svg viewBox="0 0 100 100"><path d="M40 30 L72 50 L40 70 Z" fill="#fff" stroke="#fff" stroke-width="8" stroke-linejoin="round"/></svg></button></div>
+<script type="importmap">{ "imports": { "three": "./js/three.module.min.js" } }</script>
+<script type="module" src="js/game.js"></script>
+<script src="../../gf-playlog.js" defer></script>
+</body>
+</html>

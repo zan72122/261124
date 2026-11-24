@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#8fd0f5">
+<title>ピンクとブルーのプール</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#8fd0f5;touch-action:none;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+#fade{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .45s}
+#start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 50%,rgba(255,255,255,.15),rgba(40,90,140,.35));}
+#go{width:min(46vmin,260px);height:min(46vmin,260px);border:0;border-radius:50%;padding:0;background:none;cursor:pointer;
+  animation:pulse 1.4s ease-in-out infinite;filter:drop-shadow(0 10px 18px rgba(0,0,0,.3))}
+#go svg{width:100%;height:100%}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+#hand{position:fixed;left:0;top:0;width:84px;height:84px;pointer-events:none;opacity:0;transition:opacity .3s;
+  margin:-6px 0 0 -30px;z-index:5}
+#hand.on{opacity:1}
+#hand svg{width:100%;height:100%;animation:tap 1s ease-in-out infinite;filter:drop-shadow(0 4px 6px rgba(0,0,0,.35))}
+@keyframes tap{0%,100%{transform:translateY(14px)}50%{transform:translateY(0)}}
+#again{position:fixed;right:calc(14px + env(safe-area-inset-right));top:calc(14px + env(safe-area-inset-top));width:64px;height:64px;
+  border:0;border-radius:50%;background:rgba(255,255,255,.85);box-shadow:0 4px 10px rgba(0,0,0,.25);display:none;padding:10px;z-index:6}
+#again svg{width:100%;height:100%}
+#load{position:fixed;left:50%;top:72%;width:120px;height:14px;margin-left:-60px;border-radius:7px;background:rgba(255,255,255,.5);overflow:hidden}
+#load i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff5fa2,#3d8bff);transition:width .3s}
+</style>
+
+<script src="/gf-nav.js" defer></script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="fade"></div>
+<div id="start">
+  <button id="go" aria-label="play">
+    <svg viewBox="0 0 200 200">
+      <defs>
+        <radialGradient id="gp" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffd1e6"/><stop offset=".45" stop-color="#ff5fa2"/><stop offset="1" stop-color="#c2316f"/></radialGradient>
+        <radialGradient id="gb" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#cfe4ff"/><stop offset=".45" stop-color="#3d8bff"/><stop offset="1" stop-color="#1d4fb8"/></radialGradient>
+      </defs>
+      <circle cx="100" cy="100" r="96" fill="#fff"/>
+      <circle cx="100" cy="100" r="88" fill="#6fd6ea"/>
+      <circle cx="72" cy="112" r="40" fill="url(#gp)"/>
+      <circle cx="128" cy="112" r="40" fill="url(#gb)"/>
+      <path d="M86 58 L86 104 L124 81 Z" fill="#fff" stroke="#fff" stroke-width="10" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  <div id="load"><i></i></div>
+</div>
+<div id="hand"><svg viewBox="0 0 100 100"><path d="M40 8c-5 0-8 4-8 9v38l-6-6c-4-4-10-4-13 0-3 3-3 8 0 11l22 25c4 5 9 7 15 7h14c11 0 19-9 19-20V48c0-5-4-8-8-8s-8 3-8 8v-2c0-5-4-8-8-8s-8 3-8 8v-2c0-5-4-8-8-8-2 0-3 0-4 1V17c0-5-4-9-9-9z" fill="#fff" stroke="#333" stroke-width="4" stroke-linejoin="round"/></svg></div>
+<button id="again" aria-label="again"><svg viewBox="0 0 100 100"><path d="M50 16a34 34 0 1 1-33 42" fill="none" stroke="#ff5fa2" stroke-width="12" stroke-linecap="round"/><path d="M50 2 L72 18 L50 34 Z" fill="#3d8bff"/></svg></button>
+<script type="module" src="game.js"></script>
+<script src="../../gf-playlog.js" defer></script>
+</body>
+</html>

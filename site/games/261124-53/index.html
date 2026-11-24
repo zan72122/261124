@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f4ead8">
+<title>おもちゃが ほんものに</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #f4ead8; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+  #c { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; touch-action: none; }
+  #veil { position: fixed; inset: 0; opacity: 0; pointer-events: none; background: #fff; }
+  /* 指＝女の子の手 */
+  .hand { position: fixed; width: 64px; height: 64px; margin: -14px 0 0 -26px; pointer-events: none; opacity: 0; }
+  .hand svg { width: 100%; height: 100%; filter: drop-shadow(0 3px 3px rgba(0,0,0,.25)); }
+  #hand.go { animation: tapHand .5s ease-out; }
+  @keyframes tapHand { 0% { opacity: 1; transform: scale(1.25); } 40% { opacity: 1; transform: scale(.9); } 100% { opacity: 0; transform: scale(1); } }
+  #hint { transition: opacity .3s; }
+  #hint.on { opacity: .95; animation: point 1s ease-in-out infinite; }
+  @keyframes point { 0%,100% { transform: translate(0,0); } 50% { transform: translate(8px,14px) scale(.92); } }
+  #load { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #f4ead8; }
+  #load i { width: 56px; height: 56px; border-radius: 50%; background: #d9b48a; animation: bob .8s ease-in-out infinite alternate; box-shadow: 0 8px 0 rgba(0,0,0,.08); }
+  @keyframes bob { from { transform: translateY(0) scale(1); } to { transform: translateY(-24px) scale(1.08); } }
+  #rot { display: none; }
+  @media (orientation: portrait) and (max-width: 600px) {
+    #rot { display: block; position: fixed; right: 14px; top: 14px; width: 48px; height: 48px; opacity: .7; pointer-events: none; animation: tilt 2.4s ease-in-out infinite; }
+  }
+  @keyframes tilt { 0%,40% { transform: rotate(0); } 60%,100% { transform: rotate(-90deg); } }
+</style>
+
+<script src="/gf-nav.js" defer></script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="veil"></div>
+<div id="hand" class="hand"><svg viewBox="0 0 64 64"><g fill="#f4c9a8" stroke="#b07a58" stroke-width="2" stroke-linejoin="round"><path d="M24 8c3 0 5 2 5 5v17l2-1V12c0-3 2-5 5-5s5 2 5 5v18l1 0V16c0-3 2-4 4-4s4 1 4 4v24c0 12-8 20-19 20-8 0-13-4-17-11l-7-12c-2-3-1-5 1-6s4 0 6 2l5 6V13c0-3 2-5 5-5z"/></g><path d="M14 54c6 6 22 8 32 0" fill="none" stroke="#8c7a4c" stroke-width="6" stroke-linecap="round"/></svg></div>
+<div id="hint" class="hand"><svg viewBox="0 0 64 64"><g fill="#fff" stroke="#6b4a2a" stroke-width="2.5" stroke-linejoin="round"><path d="M24 8c3 0 5 2 5 5v17l2-1V12c0-3 2-5 5-5s5 2 5 5v18l1 0V16c0-3 2-4 4-4s4 1 4 4v24c0 12-8 20-19 20-8 0-13-4-17-11l-7-12c-2-3-1-5 1-6s4 0 6 2l5 6V13c0-3 2-5 5-5z"/></g></svg></div>
+<svg id="rot" viewBox="0 0 48 48"><rect x="14" y="4" width="20" height="36" rx="4" fill="none" stroke="#6b4a2a" stroke-width="3"/><circle cx="24" cy="35" r="2" fill="#6b4a2a"/></svg>
+<div id="load"><i></i></div>
+<script type="module" src="main.js"></script>
+<script src="/gf-playlog.js" defer></script>
+</body>
+</html>

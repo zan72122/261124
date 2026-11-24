@@ -584,6 +584,9 @@ export function makeRoom(o) {
   const sl = mesh(new THREE.BoxGeometry(d, 0.9, 0.04), skM, -w / 2 + 0.02, 0.45, floor.position.z, false); sl.rotation.y = Math.PI / 2; g.add(sl);
   const sr = sl.clone(); sr.position.x = w / 2 - 0.02; g.add(sr);
   g.add(mesh(new THREE.BoxGeometry(w, 0.06, 0.07), M.brass, 0, 0.92, floor.position.z - d / 2 + 0.04, false));
+  const ceil = mesh(new THREE.PlaneGeometry(w, d), std(0xfbf6ee, 0.9), 0, h, floor.position.z, false);
+  ceil.rotation.x = Math.PI / 2; g.add(ceil);
+  g.add(mesh(new THREE.BoxGeometry(w, 0.12, 0.12), std(0xfbf6ee, 0.6), 0, h - 0.06, floor.position.z - d / 2 + 0.06, false));
   g.userData.backZ = floor.position.z - d / 2;
   return g;
 }

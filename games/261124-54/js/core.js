@@ -31,7 +31,8 @@ function applyView() {
   camera.lookAt(view.target);
   const d = view.pos.distanceTo(view.target);
   const fh = 2 * Math.atan(view.h / 2 / d);
-  const fw = 2 * Math.atan(view.w / 2 / d / camera.aspect);
+  // in portrait, trim the sides a little so the scene isn't tiny
+  const fw = 2 * Math.atan(view.w * (camera.aspect < 1 ? 0.9 : 1) / 2 / d / camera.aspect);
   camera.fov = THREE.MathUtils.radToDeg(Math.max(fh, fw));
   camera.updateProjectionMatrix();
 }

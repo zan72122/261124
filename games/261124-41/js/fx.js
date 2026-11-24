@@ -1,7 +1,23 @@
 // fx.js — particles, steam, ripples, hint hand + target glow, round buttons, iris transition.
-import { TAU, clamp, lerp, rnd, canvas2d, L, ease } from './engine.js';
+import { TAU, clamp, lerp, rnd, canvas2d, L, ease, pxScale, bucket } from './engine.js';
 import { img } from './assets.js';
 import { shapePath, heartPath, drawHand } from './shapes.js';
+
+// heart sprites (one per colour + one shadow): a 160-point path per heart per frame is costly on phones
+const HR = 160, HS = 384;
+const heartSpr = {};
+function heartSprite(color) {
+  if (heartSpr[color]) return heartSpr[color];
+  const c = canvas2d(HS, HS), x = c.getContext('2d');
+  const o = HS / 2;
+  x.fillStyle = color;
+  heartPath(x, o, o, HR); x.fill();
+  if (color !== 'rgba(120,20,40,0.22)') {
+    x.fillStyle = 'rgba(255,255,255,0.55)';
+    x.beginPath(); x.ellipse(o - HR * 0.35, o - HR * 0.3, HR * 0.16, HR * 0.1, -0.6, 0, TAU); x.fill();
+  }
+  return (heartSpr[color] = c);
+}
 
 // ---------------------------------------------------------------- pre-rendered soft sprites
 function softPuff(seed, heart) {
@@ -228,12 +244,11 @@ function drawList(ctx, list) {
         } else x += Math.sin(p.age * 4 + p.wob) * 10;
         ctx.globalAlpha = k < 0.15 ? k / 0.15 : k > 0.7 ? (1 - k) / 0.3 : 1;
         const pop = p.type === 'heart' ? ease.outBack(Math.min(1, k * 5)) : 1;
-        ctx.fillStyle = 'rgba(120,20,40,0.22)';
-        heartPath(ctx, x + 3, y + 4, s * pop); ctx.fill();
-        ctx.fillStyle = p.color;
-        heartPath(ctx, x, y, s * pop); ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.55)';
-        ctx.beginPath(); ctx.ellipse(x - s * 0.35 * pop, y - s * 0.3 * pop, s * 0.16 * pop, s * 0.1 * pop, -0.6, 0, TAU); ctx.fill();
+        const hs = s * pop * HS / HR;
+        if (hs > 0) {
+          ctx.drawImage(heartSprite('rgba(120,20,40,0.22)'), x + 3 - hs / 2, y + 4 - hs / 2, hs, hs);
+          ctx.drawImage(heartSprite(p.color), x - hs / 2, y - hs / 2, hs, hs);
+        }
         break;
       }
       case 'drop': {
@@ -407,13 +422,13 @@ function ringAt(ctx, x, y, k) {
   ctx.restore();
 }
 
-// ---------------------------------------------------------------- round button (play / replay)
-export function drawButton(ctx, x, y, r, icon, time, alpha = 1) {
-  if (alpha <= 0) return;
-  const pulse = 1 + Math.sin(time * 3.2) * 0.04;
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.translate(x, y); ctx.scale(pulse, pulse);
+const btnCache = {};
+function buttonSprite(r, icon, k) {
+  const key = icon + '|' + r + '|' + k;
+  if (btnCache[key]) return btnCache[key];
+  const H = r * 1.25 + 16, S = Math.ceil(H * 2 * k);
+  const c = canvas2d(S, S), ctx = c.getContext('2d');
+  ctx.translate(S / 2, S / 2); ctx.scale(k, k);
   // soft shadow
   const g = ctx.createRadialGradient(8, 14, r * 0.7, 8, 14, r * 1.25);
   g.addColorStop(0, 'rgba(40,20,0,0.35)'); g.addColorStop(1, 'rgba(40,20,0,0)');
@@ -438,6 +453,18 @@ export function drawButton(ctx, x, y, r, icon, time, alpha = 1) {
     ctx.beginPath(); ctx.moveTo(ax + r * 0.24, ay - r * 0.02); ctx.lineTo(ax - r * 0.06, ay - r * 0.2); ctx.lineTo(ax + r * 0.02, ay + r * 0.2); ctx.closePath();
     ctx.fill(); ctx.stroke();
   }
+  return (btnCache[key] = { c, H });
+}
+
+// ---------------------------------------------------------------- round button (play / replay)
+export function drawButton(ctx, x, y, r, icon, time, alpha = 1) {
+  if (alpha <= 0) return;
+  const pulse = 1 + Math.sin(time * 3.2) * 0.04;
+  const sp = buttonSprite(r, icon, bucket(pxScale(ctx) * 1.04, 0.25, 4));
+  const H = sp.H * pulse;
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  ctx.drawImage(sp.c, x - H, y - H, H * 2, H * 2);
   ctx.restore();
 }
 

@@ -76,25 +76,42 @@ function handParts(ctx) {
   ctx.moveTo(-18, 112); ctx.ellipse(-24, 100, 14, 28, -0.5, 0, TAU);
 }
 
+// hand sprites (shadow + body) rendered once per pixel scale; bounds of handParts incl. stroke
+const HB = { x0: -48, y0: -18, x1: 90, y1: 160 };
+const handCache = {};
+function handSprite(k) {
+  if (handCache[k]) return handCache[k];
+  const w = Math.ceil((HB.x1 - HB.x0) * k), h = Math.ceil((HB.y1 - HB.y0) * k);
+  const mk = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.scale(k, k); x.translate(-HB.x0, -HB.y0); return [c, x]; };
+  const [sc, sx] = mk();
+  sx.fillStyle = 'rgba(30,15,5,0.22)'; handParts(sx); sx.fill('nonzero');
+  const [bc, bx] = mk();
+  bx.lineJoin = 'round';
+  bx.strokeStyle = 'rgba(120,90,70,0.55)'; bx.lineWidth = 9; handParts(bx); bx.stroke();
+  bx.fillStyle = '#fffdf8'; handParts(bx); bx.fill('nonzero');
+  bx.fillStyle = 'rgba(255,200,190,0.75)';
+  bx.beginPath(); bx.ellipse(0, 6, 8, 10, 0, 0, TAU); bx.fill();
+  return (handCache[k] = { shadow: sc, body: bc });
+}
+function curScale(ctx) {
+  if (ctx.getTransform) { const m = ctx.getTransform(); return Math.hypot(m.a, m.b) || 1; }
+  return 2;
+}
+
 export function drawHand(ctx, x, y, scale, press, alpha) {
   if (alpha <= 0) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-0.38);
   const s = scale * (1 - press * 0.08);
+  const k = Math.min(6, Math.pow(2, Math.ceil(Math.log2(curScale(ctx) * scale) * 4) / 4));
+  const sp = handSprite(k);
+  const bw = HB.x1 - HB.x0, bh = HB.y1 - HB.y0;
   ctx.globalAlpha = alpha;
   // shadow (closer when pressed)
   const sd = 18 - press * 12;
-  ctx.save(); ctx.translate(sd * 0.9, sd * 1.2); ctx.scale(s, s);
-  ctx.fillStyle = 'rgba(30,15,5,0.22)'; handParts(ctx); ctx.fill('nonzero');
-  ctx.restore();
-  ctx.scale(s, s);
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = 'rgba(120,90,70,0.55)'; ctx.lineWidth = 9; handParts(ctx); ctx.stroke();
-  ctx.fillStyle = '#fffdf8'; handParts(ctx); ctx.fill('nonzero');
-  // fingernail
-  ctx.fillStyle = 'rgba(255,200,190,0.75)';
-  ctx.beginPath(); ctx.ellipse(0, 6, 8, 10, 0, 0, TAU); ctx.fill();
+  ctx.drawImage(sp.shadow, sd * 0.9 + HB.x0 * s, sd * 1.2 + HB.y0 * s, bw * s, bh * s);
+  ctx.drawImage(sp.body, HB.x0 * s, HB.y0 * s, bw * s, bh * s);
   ctx.restore();
 }
 

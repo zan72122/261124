@@ -1,5 +1,5 @@
 // main.js — boot, loader, frame loop, scene manager, debug hooks.
-import { L, layout, stageTransform, initInput, clamp, TAU, unitsToCss } from './engine.js';
+import { L, layout, stageTransform, initInput, clamp, TAU, unitsToCss, getQuality, setQuality } from './engine.js';
 import { loadAssets } from './assets.js';
 import { fx, hint, drawIris } from './fx.js';
 import { bubbles } from './bubbles.js';
@@ -23,7 +23,8 @@ const SCENES = { title, home, wash, cut, stamp, pot, roux, serve, eat, end };
 const ORDER = Object.keys(SCENES);
 
 const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
+// opaque canvas: the compositor never has to blend it with the page
+const ctx = canvas.getContext('2d', { alpha: false });
 let loadK = 0, loaded = false;
 let trans = null; // { k, dir, id, opts }
 let downDelivered = false;
@@ -89,6 +90,7 @@ function go(id, opts = {}) {
 game.goto = go;
 
 function switchTo(id, opts) {
+  fw.hold = 1.5;
   if (game.scene && game.scene.exit) game.scene.exit(id);
   game.clock.clear();
   fx.clear();
@@ -122,8 +124,32 @@ function frame(now) {
   raf = requestAnimationFrame(frame);
   const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
   last = now;
+  if (fw.apply) { fw.apply = false; layout(canvas); }  // resize right before drawing: no blank frame
+  const t0 = performance.now();
   update(dt);
   render();
+  watchFrame(now, performance.now() - t0);
+}
+
+// Safety net for slower iPhones/iPads: if frames keep arriving late AND the frame work itself is heavy,
+// render at a slightly lower resolution (never below 1.5x on retina screens). A plain 30 fps cap
+// (Low Power Mode) has light work and is left alone.
+const fw = { last: 0, gaps: [], work: [], hold: 1.5, steps: 0, apply: false };
+function watchFrame(now, work) {
+  if (!loaded || trans || document.hidden || /cutscene/.test(game.phase)) { fw.gaps.length = 0; fw.work.length = 0; fw.last = now; return; }
+  if (fw.hold > 0) { fw.hold -= Math.min(0.1, (now - fw.last) / 1000); fw.last = now; return; }
+  fw.gaps.push(now - fw.last); fw.work.push(work); fw.last = now;
+  if (fw.gaps.length < 120) return;
+  const med = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1];
+  const gap = med(fw.gaps), w = med(fw.work);
+  fw.gaps.length = 0; fw.work.length = 0;
+  const q = getQuality(), dpr0 = Math.min(window.devicePixelRatio || 1, 2);
+  if (gap > 22 && w > 6 && fw.steps < 3 && dpr0 * q * 0.85 >= Math.min(1.5, dpr0) - 1e-3) {
+    fw.steps++;
+    setQuality(q * 0.85);
+    fw.apply = true;
+    fw.hold = 2;
+  }
 }
 function update(dt) {
   game.time += dt;
@@ -141,12 +167,15 @@ function update(dt) {
   hint.update(dt);
 }
 function render() {
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = '#2a1c12';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const s = game.scene;
+  // every scene paints a full-screen backdrop first, so the clear is only needed before that
+  if (!loaded || !s || !s.draw) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#2a1c12';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
   stageTransform(ctx);
   if (!loaded) { drawLoader(); return; }
-  const s = game.scene;
   if (s && s.draw) s.draw(ctx);
   fx.drawSteam(ctx, 'world');
   fx.drawParts(ctx, 'world');

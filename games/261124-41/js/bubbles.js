@@ -1,5 +1,5 @@
 // bubbles.js — the two round portrait "wipes" (Mama top-left, girl top-right) and the thought bubble.
-import { L, TAU, clamp, lerp, ease, Spring, canvas2d } from './engine.js';
+import { L, TAU, clamp, lerp, ease, Spring, canvas2d, pxScale, bucket } from './engine.js';
 import { img, size } from './assets.js';
 import { cloudPath } from './shapes.js';
 import { fx } from './fx.js';
@@ -13,6 +13,53 @@ function shadowSprite() {
   g.addColorStop(0, 'rgba(25,12,4,0.55)'); g.addColorStop(1, 'rgba(25,12,4,0)');
   x.fillStyle = g; x.fillRect(0, 0, 128, 128);
   return SHADOW;
+}
+
+// warm glow ring behind a bubble (drawn with globalAlpha = glow)
+let GLOWR = null;
+function glowRing() {
+  if (GLOWR) return GLOWR;
+  GLOWR = canvas2d(256, 256);
+  const x = GLOWR.getContext('2d');
+  const g = x.createRadialGradient(128, 128, 128 * 0.9 / 1.45, 128, 128, 128);
+  g.addColorStop(0, 'rgba(255,230,120,0.7)'); g.addColorStop(1, 'rgba(255,230,120,0)');
+  x.fillStyle = g; x.beginPath(); x.arc(128, 128, 128, 0, TAU); x.fill();
+  return GLOWR;
+}
+
+// The whole portrait disc (cream rim, coloured ring, face clipped to a circle, inner shade, gloss)
+// pre-rendered per face and pixel size: one drawImage per frame instead of a clip + gradients.
+const DISC_PAD = 1.04;
+const discs = new Map();
+function disc(who, face, px) {
+  const key = face + '|' + px;
+  let c = discs.get(key);
+  if (c) return c;
+  if (discs.size > 40) discs.clear();
+  const S = Math.ceil(px * DISC_PAD);
+  c = canvas2d(S, S);
+  const x = c.getContext('2d');
+  const r = px / 2;
+  x.translate(S / 2, S / 2);
+  x.fillStyle = '#fff7e8';
+  x.beginPath(); x.arc(0, 0, r, 0, TAU); x.fill();
+  x.strokeStyle = who === 'mama' ? '#ffb27a' : '#ff9fb8';
+  x.lineWidth = r * 0.035;
+  x.beginPath(); x.arc(0, 0, r * 0.985, 0, TAU); x.stroke();
+  const ri = r * 0.9;
+  x.save();
+  x.beginPath(); x.arc(0, 0, ri, 0, TAU); x.clip();
+  x.imageSmoothingQuality = 'high';
+  drawFace(x, face, ri, 1);
+  const g = x.createRadialGradient(0, 0, ri * 0.75, 0, 0, ri);
+  g.addColorStop(0, 'rgba(60,30,10,0)'); g.addColorStop(1, 'rgba(60,30,10,0.22)');
+  x.fillStyle = g; x.fillRect(-ri, -ri, ri * 2, ri * 2);
+  x.restore();
+  x.globalCompositeOperation = 'screen';
+  x.strokeStyle = 'rgba(255,255,255,0.45)'; x.lineWidth = r * 0.05; x.lineCap = 'round';
+  x.beginPath(); x.arc(0, 0, r * 0.8, Math.PI * 1.08, Math.PI * 1.38); x.stroke();
+  discs.set(key, c);
+  return c;
 }
 
 let homes = null;
@@ -89,33 +136,19 @@ class Bubble {
     // shadow
     const sh = shadowSprite();
     ctx.drawImage(sh, -r * 1.05 + r * 0.1, -r * 1.05 + r * 0.16, r * 2.3, r * 2.3);
+    const px = bucket(p.d * (1 + Math.max(0, this.boost)) * 1.06 * pxScale(ctx), 32, 1536);
     ctx.rotate(rot);
     ctx.scale(sx, sy * (1 - this.bow * 0.08));
     if (this.glow > 0) {
-      const g = ctx.createRadialGradient(0, 0, r * 0.9, 0, 0, r * 1.45);
-      g.addColorStop(0, `rgba(255,230,120,${0.7 * this.glow})`); g.addColorStop(1, 'rgba(255,230,120,0)');
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, r * 1.45, 0, TAU); ctx.fill();
+      ctx.globalAlpha = this.glow;
+      ctx.drawImage(glowRing(), -r * 1.45, -r * 1.45, r * 2.9, r * 2.9);
+      ctx.globalAlpha = 1;
     }
-    // cream rim
-    ctx.fillStyle = '#fff7e8';
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
-    ctx.strokeStyle = this.who === 'mama' ? '#ffb27a' : '#ff9fb8';
-    ctx.lineWidth = r * 0.035;
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.985, 0, TAU); ctx.stroke();
-    // portrait
-    const ri = r * 0.9;
-    ctx.save();
-    ctx.beginPath(); ctx.arc(0, 0, ri, 0, TAU); ctx.clip();
-    if (this.prev && this.fadeT < 1) drawFace(ctx, this.prev, ri, 1);
-    drawFace(ctx, this.face, ri, this.prev ? ease.outQuad(this.fadeT) : 1);
-    // inner edge shade + gloss
-    const g = ctx.createRadialGradient(0, 0, ri * 0.75, 0, 0, ri);
-    g.addColorStop(0, 'rgba(60,30,10,0)'); g.addColorStop(1, 'rgba(60,30,10,0.22)');
-    ctx.fillStyle = g; ctx.fillRect(-ri, -ri, ri * 2, ri * 2);
-    ctx.restore();
-    ctx.globalCompositeOperation = 'screen';
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = r * 0.05; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.8, Math.PI * 1.08, Math.PI * 1.38); ctx.stroke();
+    // cached disc, sized from the bubble's resting diameter (not the pop-in scale) so it is rendered rarely
+    const S = r * 2 * DISC_PAD;
+    if (this.prev && this.fadeT < 1) ctx.drawImage(disc(this.who, this.prev, px), -S / 2, -S / 2, S, S);
+    ctx.globalAlpha = this.prev && this.fadeT < 1 ? ease.outQuad(this.fadeT) : 1;
+    ctx.drawImage(disc(this.who, this.face, px), -S / 2, -S / 2, S, S);
     ctx.restore();
   }
 }

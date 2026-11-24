@@ -43,11 +43,14 @@ export class Clock {
   constructor() { this.t = 0; this.items = []; }
   update(dt) {
     this.t += dt;
+    // compact in place (no per-frame arrays); items added during step() go after the survivors
     const list = this.items;
     this.items = [];
-    const keep = [];
-    for (const it of list) if (!it.dead && !it.step(dt)) keep.push(it);
-    this.items = keep.concat(this.items);
+    let j = 0;
+    for (let i = 0; i < list.length; i++) { const it = list[i]; if (!it.dead && !it.step(dt)) list[j++] = it; }
+    list.length = j;
+    if (this.items.length) for (const it of this.items) list.push(it);
+    this.items = list;
   }
   clear() { for (const it of this.items) it.dead = true; this.items = []; }
   wait(sec) {
@@ -106,12 +109,17 @@ function readSafe() {
   return { l: n(cs.paddingLeft), t: n(cs.paddingTop), r: n(cs.paddingRight), b: n(cs.paddingBottom) };
 }
 
+// render-resolution scale (1 = full); lowered by main.js only when a device keeps missing frames
+let quality = 1;
+export const getQuality = () => quality;
+export function setQuality(q) { quality = q; }
+
 export function layout(canvas) {
   const W = Math.max(1, window.innerWidth), H = Math.max(1, window.innerHeight);
   const s = readSafe();
   const aw = Math.max(1, W - s.l - s.r), ah = Math.max(1, H - s.t - s.b);
   const u = Math.min(aw, ah) / 1000;
-  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2) * quality);
   if (W * H * dpr * dpr > 4e6) dpr = Math.sqrt(4e6 / (W * H));
   Object.assign(L, { W, H, dpr, u, sx: s.l + (aw - 1000 * u) / 2, sy: s.t + (ah - 1000 * u) / 2 });
   L.ex0 = -L.sx / u; L.ey0 = -L.sy / u; L.ex1 = (W - L.sx) / u; L.ey1 = (H - L.sy) / u;
@@ -167,6 +175,16 @@ export function initInput(canvas, h) {
   for (const ev of ['touchstart', 'touchmove', 'gesturestart', 'gesturechange', 'contextmenu', 'dblclick', 'selectstart']) {
     document.addEventListener(ev, block, { passive: false });
   }
+}
+
+// device pixels per unit of the context's current transform (for sizing cached sprites)
+export function pxScale(ctx) {
+  if (ctx.getTransform) { const m = ctx.getTransform(); return Math.hypot(m.a, m.b) || 1; }
+  return L.dpr * L.u;
+}
+// quarter-octave bucket >= v, so cached sprites are re-rendered rarely and never upscaled much
+export function bucket(v, lo = 16, hi = 2048) {
+  return Math.min(hi, Math.max(lo, Math.pow(2, Math.ceil(Math.log2(Math.max(1, v)) * 4) / 4)));
 }
 
 export function canvas2d(w, h) {

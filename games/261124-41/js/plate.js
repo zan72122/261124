@@ -5,6 +5,16 @@ import { img, geo, size } from './assets.js';
 import { softBlob } from './fx.js';
 
 const CS = 640;
+// food layers pre-scaled to the mask canvas size (the reveal re-composites them every frame)
+const scaled = {};
+function layerAtCS(name) {
+  if (scaled[name]) return scaled[name];
+  const c = canvas2d(CS, CS);
+  const x = c.getContext('2d');
+  x.imageSmoothingQuality = 'high';
+  x.drawImage(img(name), 0, 0, CS, CS);
+  return (scaled[name] = c);
+}
 
 export function createPlate(x, y, w) {
   const c = canvas2d(CS, CS);
@@ -63,7 +73,7 @@ export function drawPlate(ctx, p, o = {}) {
     cx.clearRect(0, 0, CS, CS);
     blobMask(cx, r.nx, r.ny, clamp(r.k, 0, 1), r.kind);
     cx.globalCompositeOperation = 'source-in';
-    cx.drawImage(img(r.layer), 0, 0, CS, CS);
+    cx.drawImage(layerAtCS(r.layer), 0, 0);
     cx.globalCompositeOperation = 'source-over';
     ctx.drawImage(p.c, x0, y0, dw, dh);
   }

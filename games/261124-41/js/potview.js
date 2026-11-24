@@ -1,6 +1,6 @@
 // potview.js — the stove + pot seen from above, shared by the pot and roux scenes:
 // flames, pieces lying in the pot, water, golden broth, the curry "mix" transformation, the lid.
-import { TAU, rnd, clamp, Spring, canvas2d, ease } from './engine.js';
+import { TAU, rnd, clamp, Spring, canvas2d, ease, L, stageTransform } from './engine.js';
 import { spr, backdrop, tint } from './sprite.js';
 import { img, size, geo } from './assets.js';
 import { softBlob } from './fx.js';
@@ -86,11 +86,34 @@ export function potSpots(pv, n) {
   return out;
 }
 
-export function drawStove(ctx, pv) {
+// Backdrop + warm tint + the burner's blue glow are static once the flame is lit: they are composed into
+// one screen-sized layer (rebuilt only when they change), leaving just the flame petals per frame.
+let stove = null, stoveKey = '', stoveSeen = '';
+function stoveBase(ctx, pv) {
   const b = geo('bg_stove', 'burner', { cx: 0.5, cy: 0.5, r: 0.2 });
   const S = clamp((POT.outerR * 1.02) / b.r, 1300, 2200);
   backdrop(ctx, 'bg_stove', POT.x - (b.cx - 0.5) * S, POT.y - (b.cy - 0.5) * S, S, { crop: 0.25, vig: 0.45, vx: POT.x, vy: POT.y });
   if (pv.warm > 0) tint(ctx, `rgba(255,140,50,${0.06 * pv.warm})`);
+  drawFlameGlow(ctx, pv);
+}
+export function drawStove(ctx, pv) {
+  const key = [L.W, L.H, L.dpr, L.u, POT.x, POT.y, POT.outerR, pv.warm.toFixed(3), pv.flame.toFixed(3)].join('|');
+  if (key !== stoveKey && key === stoveSeen) {
+    // unchanged for two frames in a row: (re)build the layer
+    if (!stove) stove = document.createElement('canvas');
+    stove.width = Math.round(L.W * L.dpr); stove.height = Math.round(L.H * L.dpr);
+    const c = stove.getContext('2d');
+    stageTransform(c);
+    stoveBase(c, pv);
+    stoveKey = key;
+  }
+  stoveSeen = key;
+  if (key === stoveKey) {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(stove, 0, 0);
+    ctx.restore();
+  } else stoveBase(ctx, pv);
   drawFlames(ctx, pv);
 }
 
@@ -110,25 +133,32 @@ function petal() {
   return PETAL;
 }
 
-function drawFlames(ctx, pv) {
+function drawFlameGlow(ctx, pv) {
   if (pv.flame <= 0.01) return;
-  const t = pv.t, R = POT.outerR, f = pv.flame;
+  const R = POT.outerR, f = pv.flame;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   const glow = ctx.createRadialGradient(POT.x, POT.y, R * 0.9, POT.x, POT.y, R * 1.35);
   glow.addColorStop(0, `rgba(60,120,255,${0.35 * f})`); glow.addColorStop(1, 'rgba(40,80,255,0)');
   ctx.fillStyle = glow;
   ctx.beginPath(); ctx.arc(POT.x, POT.y, R * 1.35, 0, TAU); ctx.fill();
-  const N = 28, P = petal();
+  ctx.restore();
+}
+
+function drawFlames(ctx, pv) {
+  if (pv.flame <= 0.01) return;
+  const t = pv.t, R = POT.outerR, f = pv.flame;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const N = 28, P = petal(), r0 = R - 10;
+  const m = ctx.getTransform ? ctx.getTransform() : null;
   for (let i = 0; i < N; i++) {
     const a = (i / N) * TAU + 0.05 * Math.sin(t * 3 + i);
     const len = f * (34 + 9 * Math.sin(t * 17 + i * 2.3) + 6 * Math.sin(t * 29 + i * 5.1));
-    const r0 = R - 10;
-    ctx.save();
+    if (m) ctx.setTransform(m); else { ctx.restore(); ctx.save(); ctx.globalCompositeOperation = 'lighter'; }
     ctx.translate(POT.x + Math.cos(a) * r0, POT.y + Math.sin(a) * r0);
     ctx.rotate(a + Math.PI / 2);
     ctx.drawImage(P, -10, -len, 20, len + 6);
-    ctx.restore();
   }
   ctx.restore();
 }
@@ -145,6 +175,28 @@ function drawPiece(ctx, pv, p) {
   if (cook > 0) spr(ctx, p.cooked, x, y, p.w, Object.assign({}, o, { alpha: cook, shadow: cook >= 1 }));
 }
 
+// gradients that only depend on the inner circle: rendered once in a unit square (radius = 256 px)
+const GS = 512;
+let WALL = null, BROTH_HL = null;
+function wallShade() {
+  if (WALL) return WALL;
+  WALL = canvas2d(GS, GS);
+  const x = WALL.getContext('2d'), r = GS / 2;
+  const sh = x.createRadialGradient(r - r * 0.1, r - r * 0.12, r * 0.7, r, r, r);
+  sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(0.65, 'rgba(10,5,0,0.14)'); sh.addColorStop(1, 'rgba(10,5,0,0.5)');
+  x.fillStyle = sh; x.fillRect(0, 0, GS, GS);
+  return WALL;
+}
+function brothHL() {
+  if (BROTH_HL) return BROTH_HL;
+  BROTH_HL = canvas2d(GS, GS);
+  const x = BROTH_HL.getContext('2d'), r = GS / 2;
+  const hl = x.createRadialGradient(r - r * 0.35, r - r * 0.4, 0, r - r * 0.35, r - r * 0.4, r * 0.9);
+  hl.addColorStop(0, 'rgba(255,220,140,0.28)'); hl.addColorStop(1, 'rgba(255,220,140,0)');
+  x.fillStyle = hl; x.fillRect(0, 0, GS, GS);
+  return BROTH_HL;
+}
+
 function clipInner(ctx, g) { ctx.beginPath(); ctx.arc(g.ix, g.iy, g.ir, 0, TAU); ctx.clip(); }
 
 export function drawPot(ctx, pv) {
@@ -159,9 +211,7 @@ export function drawPot(ctx, pv) {
   for (const p of pv.pieces) if (p.float && p.inPot !== false) drawPiece(ctx, pv, p);
   drawSurface(ctx, pv);
   // the pot wall darkens toward the rim
-  const sh = ctx.createRadialGradient(g.ix - g.ir * 0.1, g.iy - g.ir * 0.12, g.ir * 0.7, g.ix, g.iy, g.ir);
-  sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(0.65, 'rgba(10,5,0,0.14)'); sh.addColorStop(1, 'rgba(10,5,0,0.5)');
-  ctx.fillStyle = sh; ctx.fillRect(g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
+  ctx.drawImage(wallShade(), g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
   ctx.restore();
   if (pv.lid && pv.lid.alpha > 0) drawLid(ctx, pv);
 }
@@ -197,9 +247,8 @@ function drawBroth(ctx, pv) {
   ctx.fillStyle = `rgba(214,150,52,${0.5 * b})`;
   ctx.fillRect(g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
   ctx.globalCompositeOperation = 'screen';
-  const hl = ctx.createRadialGradient(g.ix - g.ir * 0.35, g.iy - g.ir * 0.4, 0, g.ix - g.ir * 0.35, g.iy - g.ir * 0.4, g.ir * 0.9);
-  hl.addColorStop(0, `rgba(255,220,140,${0.28 * b})`); hl.addColorStop(1, 'rgba(255,220,140,0)');
-  ctx.fillStyle = hl; ctx.fillRect(g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
+  ctx.globalAlpha = b;
+  ctx.drawImage(brothHL(), g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
   ctx.restore();
   caustics(ctx, pv, 0.07 * b);
 }
@@ -247,13 +296,14 @@ function drawLid(ctx, pv) {
 const MS = 256, CS = 512;
 export function initMix(pv) {
   const M = canvas2d(MS, MS), T = canvas2d(MS, MS), C = canvas2d(CS, CS), S = canvas2d(16, 16);
-  pv.mix = { M, T, C, S, sx: S.getContext('2d', { willReadFrequently: true }), mean: 0, base: 0, pending: 0, texAng: 0, thick: 0, done: false };
+  pv.mix = { M, T, C, C2: canvas2d(CS, CS), S, sx: S.getContext('2d', { willReadFrequently: true }), mean: 0, base: 0, pending: 0, texAng: 0, thick: 0, done: false, dirty: true, full: false, texKey: '' };
 }
 // stage coords -> mask pixel coords
 function toM(pv, x, y) { const g = pv.g; return { x: ((x - g.ix) / (g.ir * 2) + 0.5) * MS, y: ((y - g.iy) / (g.ir * 2) + 0.5) * MS }; }
 
 export function mixRotate(pv, ang, ringR, ringW, ringAng) {
   const m = pv.mix, mx = m.M.getContext('2d'), tx = m.T.getContext('2d');
+  m.dirty = true;
   tx.clearRect(0, 0, MS, MS);
   tx.drawImage(m.M, 0, 0);
   mx.save();
@@ -278,6 +328,7 @@ export function mixRotate(pv, ang, ringR, ringW, ringAng) {
 export function mixDeposit(pv, x, y, r, a) {
   const m = pv.mix, mx = m.M.getContext('2d');
   const p = toM(pv, x, y), rr = (r / (pv.g.ir * 2)) * MS;
+  m.dirty = true;
   mx.globalAlpha = clamp(a, 0, 1);
   mx.drawImage(softBlob(), p.x - rr, p.y - rr, rr * 2, rr * 2);
   mx.globalAlpha = 1;
@@ -289,6 +340,7 @@ export function mixRaise(pv, amount) {
   m.pending += amount; m.base += amount;
   if (m.pending < 4 / 255) return;
   const mx = m.M.getContext('2d');
+  m.dirty = true;
   mx.save();
   mx.globalCompositeOperation = 'lighter';
   mx.fillStyle = `rgba(255,255,255,${m.pending})`;
@@ -300,6 +352,8 @@ export function mixRaise(pv, amount) {
 export function mixFill(pv) {
   const mx = pv.mix.M.getContext('2d');
   mx.fillStyle = '#fff'; mx.fillRect(0, 0, MS, MS);
+  // a full mask stays full: rotating a square never uncovers its inscribed circle (the only part shown)
+  pv.mix.full = true; pv.mix.dirty = true;
   pv.mix.mean = 1; pv.mix.base = Math.max(pv.mix.base, 1);
 }
 
@@ -319,37 +373,78 @@ export function mixMeasure(pv) {
 
 // Two stages: A = glossy brown sauce through the mix mask M (ribbons that follow the spoon),
 // B = the chunky curry photo through the same mask, faded in by m.thick (it "sets" in the last third).
-function drawMix(ctx, pv) {
-  const m = pv.mix, g = pv.g;
-  const cx = m.C.getContext('2d');
-  cx.clearRect(0, 0, CS, CS);
+// the sauce colour layer (fill + shading) never changes: baked once
+let SAUCE = null;
+function sauce() {
+  if (SAUCE) return SAUCE;
+  SAUCE = canvas2d(CS, CS);
+  const cx = SAUCE.getContext('2d');
   cx.fillStyle = 'rgba(122,66,22,0.86)';
   cx.fillRect(0, 0, CS, CS);
   const sh = cx.createRadialGradient(CS * 0.38, CS * 0.34, CS * 0.05, CS / 2, CS / 2, CS * 0.55);
   sh.addColorStop(0, 'rgba(170,100,40,0.35)'); sh.addColorStop(1, 'rgba(60,28,6,0.35)');
   cx.fillStyle = sh; cx.fillRect(0, 0, CS, CS);
-  cx.globalCompositeOperation = 'destination-in';
-  cx.drawImage(m.M, 0, 0, CS, CS);
-  cx.globalCompositeOperation = 'source-over';
-  // drawn twice: thin ribbons already read as brown sauce instead of a pale tint
-  ctx.drawImage(m.C, g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
-  ctx.drawImage(m.C, g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
-  if (m.thick > 0.005) {
-    cx.clearRect(0, 0, CS, CS);
-    cx.save();
-    cx.translate(CS / 2, CS / 2); cx.rotate(m.texAng);
-    // texture side ≈ 1.1 × the inner diameter: chunks match the real pieces, circle stays covered
-    const D = CS * 1.1;
-    cx.drawImage(img('tex_curry'), -D / 2, -D / 2, D, D);
-    cx.restore();
-    cx.globalCompositeOperation = 'destination-in';
-    cx.drawImage(m.M, 0, 0, CS, CS);
-    cx.globalCompositeOperation = 'source-over';
-    ctx.save();
-    ctx.globalAlpha = Math.min(1, m.thick);
-    ctx.drawImage(m.C, g.ix - g.ir, g.iy - g.ir, g.ir * 2, g.ir * 2);
-    ctx.restore();
+  return SAUCE;
+}
+
+function drawTex(c, ang, D) {
+  c.save();
+  c.translate(CS / 2, CS / 2); c.rotate(ang);
+  c.drawImage(img('tex_curry'), -D / 2, -D / 2, D, D);
+  c.restore();
+}
+
+function drawMix(ctx, pv) {
+  const m = pv.mix, g = pv.g;
+  const x0 = g.ix - g.ir, y0 = g.iy - g.ir, d = g.ir * 2;
+  // texture side ≈ 1.1 × the inner diameter: chunks match the real pieces, circle stays covered
+  const D = CS * 1.1;
+  if (m.full) {
+    // mask is solid: draw the layers straight through the pot's inner clip, no masking passes
+    const sc = sauce();
+    ctx.drawImage(sc, x0, y0, d, d);
+    // drawn twice: thin ribbons already read as brown sauce instead of a pale tint
+    ctx.drawImage(sc, x0, y0, d, d);
+    if (m.thick > 0.005) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, m.thick);
+      ctx.translate(g.ix, g.iy); ctx.rotate(m.texAng);
+      const Du = d * 1.1;
+      ctx.drawImage(img('tex_curry'), -Du / 2, -Du / 2, Du, Du);
+      ctx.restore();
+    }
+  } else {
+    // A: brown sauce through the mask (rebuilt only when the mask changed)
+    const cx = m.C.getContext('2d');
+    if (m.dirty) {
+      m.texDirty = true;
+      cx.globalCompositeOperation = 'copy';
+      cx.drawImage(sauce(), 0, 0);
+      cx.globalCompositeOperation = 'destination-in';
+      cx.drawImage(m.M, 0, 0, CS, CS);
+      cx.globalCompositeOperation = 'source-over';
+    }
+    ctx.drawImage(m.C, x0, y0, d, d);
+    ctx.drawImage(m.C, x0, y0, d, d);
+    if (m.thick > 0.005) {
+      // B: the chunky curry photo through the same mask
+      const c2 = m.C2.getContext('2d');
+      if (m.texDirty || m.texKey !== m.texAng) {
+        m.texDirty = false;
+        c2.clearRect(0, 0, CS, CS);
+        drawTex(c2, m.texAng, D);
+        c2.globalCompositeOperation = 'destination-in';
+        c2.drawImage(m.M, 0, 0, CS, CS);
+        c2.globalCompositeOperation = 'source-over';
+        m.texKey = m.texAng;
+      }
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, m.thick);
+      ctx.drawImage(m.C2, x0, y0, d, d);
+      ctx.restore();
+    }
   }
+  m.dirty = false;
   // glossy swirl highlights rotating with the stir
   const a = clamp(m.mean * 1.2 - 0.1, 0, 1);
   if (a > 0) {

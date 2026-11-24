@@ -223,9 +223,7 @@ export default function wash() {
       ctx.save();
       ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, TAU); ctx.clip();
       // water body: cool translucent fill + faint mud tint picked up from washing
-      const wg = ctx.createRadialGradient(c.x - c.r * 0.3, c.y - c.r * 0.3, c.r * 0.1, c.x, c.y, c.r);
-      wg.addColorStop(0, 'rgba(170,215,235,0.28)'); wg.addColorStop(1, 'rgba(90,150,190,0.42)');
-      ctx.fillStyle = wg; ctx.fillRect(c.x - c.r, c.y - c.r, c.r * 2, c.r * 2);
+      ctx.drawImage(waterBody(), c.x - c.r, c.y - c.r, c.r * 2, c.r * 2);
       if (water.tint > 0) { ctx.fillStyle = `rgba(140,100,55,${0.16 * water.tint})`; ctx.fillRect(c.x - c.r, c.y - c.r, c.r * 2, c.r * 2); }
       if (cur) drawItem(ctx, cur);
       drawWater(ctx, c, t, water);
@@ -269,6 +267,19 @@ export default function wash() {
     },
     up() { lastP = null; loop.set(0, 0.35); measureT = 0; },
   };
+}
+
+// water body gradient, rendered once in a unit square
+let WB = null;
+function waterBody() {
+  if (WB) return WB;
+  const N = 512, r = N / 2;
+  WB = canvas2d(N, N);
+  const x = WB.getContext('2d');
+  const wg = x.createRadialGradient(r - r * 0.3, r - r * 0.3, r * 0.1, r, r, r);
+  wg.addColorStop(0, 'rgba(170,215,235,0.28)'); wg.addColorStop(1, 'rgba(90,150,190,0.42)');
+  x.fillStyle = wg; x.fillRect(0, 0, N, N);
+  return WB;
 }
 
 let GC = null;

@@ -1,5 +1,5 @@
 // stamp — a steel cookie cutter presses carrot rounds into flowers, a star and a heart.
-import { TAU, rnd, ease, Spring, lerp, dist, minHit } from '../engine.js';
+import { TAU, rnd, ease, Spring, lerp, dist, minHit, canvas2d, pxScale, bucket } from '../engine.js';
 import { spr, backdrop } from '../sprite.js';
 import { shapePath } from '../shapes.js';
 import { fx, hint } from '../fx.js';
@@ -25,6 +25,20 @@ export function drawCutter(ctx, kind, x, y, r, h, rot = 0) {
     ctx.beginPath(); shapePath(ctx, kind, x + off * 0.8, y + off * 1.2, r * (1 + h / 1000), rot); ctx.stroke();
   }
   ctx.translate(x, y); ctx.scale(k, k);
+  // the steel body never changes for a given shape/size: drawn from a cached sprite
+  const sp = cutterSprite(kind, r, rot, bucket(pxScale(ctx), 0.25, 6));
+  ctx.drawImage(sp.c, -sp.H, -sp.H, sp.H * 2, sp.H * 2);
+  ctx.restore();
+}
+
+const cutCache = {};
+function cutterSprite(kind, r, rot, k) {
+  const key = kind + '|' + r + '|' + rot + '|' + k;
+  if (cutCache[key]) return cutCache[key];
+  const H = r * 1.25 + 12, S = Math.ceil(H * 2 * k);
+  const c = canvas2d(S, S), ctx = c.getContext('2d');
+  ctx.translate(S / 2, S / 2); ctx.scale(k, k);
+  ctx.lineJoin = 'round';
   const g = ctx.createLinearGradient(-r, -r, r, r);
   g.addColorStop(0, '#f4f7fa'); g.addColorStop(0.45, '#aab2ba'); g.addColorStop(0.55, '#c9d0d6'); g.addColorStop(1, '#6f777f');
   ctx.strokeStyle = '#5d646b'; ctx.lineWidth = 15;
@@ -34,7 +48,7 @@ export function drawCutter(ctx, kind, x, y, r, h, rot = 0) {
   ctx.beginPath(); shapePath(ctx, kind, -1.5, -1.5, r + 3, rot); ctx.stroke();
   ctx.strokeStyle = 'rgba(40,45,50,0.5)'; ctx.lineWidth = 2;
   ctx.beginPath(); shapePath(ctx, kind, 0, 0, r - 5, rot); ctx.stroke();
-  ctx.restore();
+  return (cutCache[key] = { c, H });
 }
 
 export default function stamp() {

@@ -88,32 +88,29 @@ export const chef = {
   },
   frame() { return Math.max(0, Math.min(CHEF_N - 1, Math.floor(this.f + 1e-6))); },
   state() { return { f: this.frame(), clip: this.clip ? this.clip.name : this.pending ? this.pending.name + '…' : null }; },
-  // the girl inside a rounded window of side S centred on (0,0) of the current transform
+  // the girl inside a rounded window of side S centred on (0,0) of the current transform.
+  // Every frame's cut-out lies inside the window's inner rounded edge (checked over all 100 frames),
+  // so no clip path is needed: back, frame(s), front are three plain drawImage calls.
   draw(ctx, S, alpha = 1) {
     if (alpha <= 0.001) return;
     const px = bucket(S * pxScale(ctx), 32, 1536);
     const P = panel(px);
-    ctx.save();
-    ctx.globalAlpha *= alpha;
+    const a0 = ctx.globalAlpha, a = a0 * alpha;
+    ctx.globalAlpha = a;
     const T = S * PANEL_PAD;
     ctx.drawImage(P.back, -T / 2, -T / 2, T, T);
     const w = S * 0.9;
     const dx = -w / 2, dy = -S / 2 + S * 0.055;
-    const a0 = ctx.globalAlpha;
-    ctx.save();
-    const ri = S * 0.045;
-    rr(ctx, -S / 2 + ri, -S / 2 + ri, S - 2 * ri, S - 2 * ri, S * 0.22 * 0.82); ctx.clip();
     if (this.xk < 1 && this.from >= 0) {
       const k = this.xk * this.xk * (3 - 2 * this.xk);
-      ctx.globalAlpha = a0 * (1 - k);
+      ctx.globalAlpha = a * (1 - k);
       frameImg(ctx, this.from, dx, dy, w);
-      ctx.globalAlpha = a0 * k;
+      ctx.globalAlpha = a * k;
     }
     frameImg(ctx, this.frame(), dx, dy, w);
-    ctx.restore();
-    ctx.globalAlpha = a0;
+    ctx.globalAlpha = a;
     ctx.drawImage(P.front, -T / 2, -T / 2, T, T);
-    ctx.restore();
+    ctx.globalAlpha = a0;
   },
 };
 

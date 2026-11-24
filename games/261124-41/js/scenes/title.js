@@ -1,5 +1,5 @@
 // title — the curry plate filling the short side over a blurred copy of itself, a big play button.
-import { L, rnd, canvas2d } from '../engine.js';
+import { L, rnd, canvas2d, stageTransform } from '../engine.js';
 import { vignette } from '../sprite.js';
 import { img } from '../assets.js';
 import { fx, hint, drawButton } from '../fx.js';
@@ -26,6 +26,27 @@ function prepare() {
   const g = x.createRadialGradient(N / 2, N / 2, N * 0.33, N / 2, N / 2, N * 0.48);
   g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
   x.fillStyle = g; x.fillRect(0, 0, N, N);
+}
+
+let BACK = null, backKey = '';
+function drawBack(ctx) {
+  const key = [L.W, L.H, L.dpr, L.ex0, L.ey0, L.ex1, L.ey1].join('|');
+  if (key !== backKey) {
+    if (!BACK) BACK = document.createElement('canvas');
+    BACK.width = Math.round(L.W * L.dpr); BACK.height = Math.round(L.H * L.dpr);
+    const c = BACK.getContext('2d');
+    stageTransform(c);
+    const w = L.ex1 - L.ex0, h = L.ey1 - L.ey0;
+    const k = Math.max(w, h) * 1.1;
+    c.imageSmoothingEnabled = true;
+    c.drawImage(BLUR, (L.ex0 + L.ex1) / 2 - k / 2, (L.ey0 + L.ey1) / 2 - k / 2, k, k);
+    c.fillStyle = 'rgba(25,12,4,0.45)'; c.fillRect(L.ex0, L.ey0, w, h);
+    backKey = key;
+  }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(BACK, 0, 0);
+  ctx.restore();
 }
 
 function plan() {
@@ -70,6 +91,8 @@ export default function title() {
       phase('title');
       hint.set({ type: 'tap', x: () => P.bx, y: () => P.by, r: P.br, glow: false });
     },
+    // the screen-sized backdrop is only for the title: give its memory back (iOS caps canvas memory)
+    exit() { if (BACK) { BACK.width = BACK.height = 1; backKey = ''; } },
     update(dt) {
       t += dt; steamT -= dt;
       if (steamT <= 0) {
@@ -78,12 +101,8 @@ export default function title() {
       }
     },
     draw(ctx) {
-      const w = L.ex1 - L.ex0, h = L.ey1 - L.ey0;
-      // blurred, darkened backdrop (cover)
-      const k = Math.max(w, h) * 1.1;
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(BLUR, (L.ex0 + L.ex1) / 2 - k / 2, (L.ey0 + L.ey1) / 2 - k / 2, k, k);
-      ctx.fillStyle = 'rgba(25,12,4,0.45)'; ctx.fillRect(L.ex0, L.ey0, w, h);
+      // blurred, darkened backdrop (cover): static, composed once per screen size
+      drawBack(ctx);
       // sharp plate, gentle drift (never more than a few % of the plate)
       const z = 1 + Math.sin(t * 0.12) * 0.015;
       const S = P.S * z, dx = Math.sin(t * 0.09) * P.plateD * 0.012, dy = Math.cos(t * 0.07) * P.plateD * 0.01;

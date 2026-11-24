@@ -39,11 +39,18 @@ function plan() {
     plateD = Math.min(plateD, E.h - d - 2 * br - 4 * M);
     const group = d + M + plateD + M + 2 * br;
     const y0 = E.y0 + M + Math.max(0, (E.h - 2 * M - group) / 2);
-    bub = { girl: { x: E.x1 - M - d / 2, y: y0 + d / 2, d }, mama: { x: E.x0 + M + d / 2, y: y0 + d / 2, d } };
+    // the girl (stirring at her pot) is the one greeting the player: centred above the plate
+    bub = { girl: { x: E.cx, y: y0 + d / 2, d }, mama: { x: E.x0 + M + d / 2, y: y0 + d / 2, d } };
     cy = y0 + d + M + plateD / 2;
     by = cy + plateD / 2 + M + br;
   } else {
-    bub = frame({ w: plateD, h: plateD }, [], {}).bub;
+    bub = frame({ w: plateD, h: plateD }, [], { chef: true }).bub;
+    // landscape: the girl stands in the middle of the right-hand band, as big as it allows
+    const bw = (E.w - plateD) / 2;
+    if (bw > minBubble() + 2 * M) {
+      const d = Math.min(bw - 2 * M, E.h * 0.5, 480);
+      bub.girl = { x: E.x1 - bw / 2, y: E.cy - short * 0.03, d };
+    }
     cy = E.cy - short * 0.03;
     by = E.y1 - br - M * 1.5;
   }

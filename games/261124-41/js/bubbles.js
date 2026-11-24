@@ -3,6 +3,7 @@ import { L, TAU, clamp, lerp, ease, Spring, canvas2d, pxScale, bucket } from './
 import { img, size } from './assets.js';
 import { cloudPath } from './shapes.js';
 import { fx } from './fx.js';
+import { chef } from './chef.js';
 
 let SHADOW = null;
 function shadowSprite() {
@@ -79,6 +80,7 @@ class Bubble {
     this.rk = new Spring(120, 6);    // rock
     this.talkT = 0; this.wobT = 0; this.droop = 0; this.glow = 0; this.rockAmp = 0; this.bob = 1; this.t = Math.random() * 5;
     this.bow = 0; this.boost = 0; this.pulse = 0;
+    this.chefMode = false; this.ca = 0;
   }
   // scenes set their homes from layout.frame(); otherwise the screen corners
   home() {
@@ -100,7 +102,15 @@ class Bubble {
     return { x: b.x, y: b.y + this.jy.x + Math.sin(this.t * 2.1) * 5 * this.bob + this.droop * 8, d: b.d };
   }
   place(to, dur = 0.8) { this.from = this.base(); this.to = to; this.pt = dur > 0 ? 0 : 1; this.pdur = dur; }
+  // the girl as her full figure at the pot (chef.js) instead of the round face portrait
+  useChef(on) { this.chefMode = !!on; this.ca = on && chef.ready() ? 1 : 0; }
+  hit(p) {
+    if (this.vis < 0.5) return false;
+    const q = this.pos();
+    return Math.abs(p.x - q.x) < q.d * 0.5 && Math.abs(p.y - q.y) < q.d * 0.5;
+  }
   setFace(name, kick = true) {
+    if (this.chefMode && (name === 'girl_happy' || name === 'girl_wow')) chef.react();
     if (name === this.face) return;
     this.prev = this.face; this.face = name; this.fadeT = 0;
     if (kick) this.sq.kick(2.2);
@@ -117,6 +127,9 @@ class Bubble {
     this.vis = clamp(this.vis + (this.visTarget > this.vis ? dt * sp : -dt * sp), 0, 1);
     if (this.pt < 1) this.pt = Math.min(1, this.pt + dt / this.pdur);
     this.fadeT = Math.min(1, this.fadeT + dt / 0.22);
+    // the frames stream in after the title: the portrait gives way to the full figure once they are here
+    const cw = this.chefMode && chef.ready() ? 1 : 0;
+    this.ca = cw > this.ca ? Math.min(1, this.ca + dt / 0.4) : Math.max(0, this.ca - dt / 0.2);
     this.sq.update(dt); this.jy.update(dt); this.rk.update(dt);
     if (this.talkT > 0) this.talkT -= dt;
     if (this.wobT > 0) this.wobT -= dt;
@@ -146,9 +159,15 @@ class Bubble {
     }
     // cached disc, sized from the bubble's resting diameter (not the pop-in scale) so it is rendered rarely
     const S = r * 2 * DISC_PAD;
-    if (this.prev && this.fadeT < 1) ctx.drawImage(disc(this.who, this.prev, px), -S / 2, -S / 2, S, S);
-    ctx.globalAlpha = this.prev && this.fadeT < 1 ? ease.outQuad(this.fadeT) : 1;
-    ctx.drawImage(disc(this.who, this.face, px), -S / 2, -S / 2, S, S);
+    const ca = this.ca;
+    if (ca < 1) {
+      const a0 = 1 - ca;
+      if (this.prev && this.fadeT < 1) { ctx.globalAlpha = a0; ctx.drawImage(disc(this.who, this.prev, px), -S / 2, -S / 2, S, S); }
+      ctx.globalAlpha = a0 * (this.prev && this.fadeT < 1 ? ease.outQuad(this.fadeT) : 1);
+      ctx.drawImage(disc(this.who, this.face, px), -S / 2, -S / 2, S, S);
+      ctx.globalAlpha = 1;
+    }
+    if (ca > 0) chef.draw(ctx, r * 2, ca);
     ctx.restore();
   }
 }
@@ -211,7 +230,7 @@ export const bubbles = {
   thought,
   reset() { this.mama.reset(); this.girl.reset(); thought.vis = 0; thought.target = 0; homes = null; },
   setHomes(h) { homes = h || null; },
-  update(dt) { this.mama.update(dt); this.girl.update(dt); thought.update(dt); },
+  update(dt) { this.mama.update(dt); this.girl.update(dt); thought.update(dt); chef.update(dt); },
   draw(ctx) {
     this.mama.draw(ctx);
     this.girl.draw(ctx);

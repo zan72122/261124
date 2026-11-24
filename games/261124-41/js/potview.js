@@ -10,7 +10,7 @@ export const POT = { x: 500, y: 415, outerR: 350 };
 
 // pot (≈700 outer diameter) fills the short side; dishes / jug / roux dish go in the free band
 export function planPot() {
-  const F = frame({ w: 842, h: 800 }, ['meat', 'onion', 'potato', 'carrot'], { sec: 230, minSec: 210 });
+  const F = frame({ w: 842, h: 800 }, ['meat', 'onion', 'potato', 'carrot'], { sec: 230, minSec: 210, chef: true });
   POT.x = F.px; POT.y = F.py; POT.outerR = 350 * F.k;
   const side = F.mode === 'side';
   const right = slotCentre(F, ['potato', 'carrot']);

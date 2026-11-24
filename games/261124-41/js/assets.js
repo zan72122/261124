@@ -90,6 +90,13 @@ export const GROUPS = [
   // last group: whatever is left (plates, table, toppings, anything only the manifest lists)
   ['serve', []],
 ];
+// the girl at her pot (sprite-girl/, 100 frames): the stirring loop and the smile first, so she can
+// take over the title and the stove scenes; the rest (ingredients, curry, wink) before the pot scene
+export const CHEF_N = 100;
+export const chefName = (i) => 'girl_f' + String(i).padStart(3, '0');
+const chefRange = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => chefName(a + i));
+GROUPS[1][1].push(...chefRange(0, 27), ...chefRange(54, 61));
+GROUPS[4][1].push(...chefRange(28, 53), ...chefRange(62, CHEF_N - 1));
 const GROUP_IDS = GROUPS.map((g) => g[0]);
 
 const fin = {};       // name -> true once settled (loaded or failed)
@@ -104,6 +111,19 @@ function fetchManifest() {
     manifestP = fetch('assets/manifest.json')
       .then((r) => (r.ok ? r.json() : null)).catch(() => null)
       .then((m) => { manifest = m; return entriesOf(m); });
+    // frames of the girl sprite, described by their own small manifest
+    const chefP = fetch('assets/sprite-girl/manifest.json')
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    manifestP = Promise.all([manifestP, chefP]).then(([ents, cm]) => {
+      if (cm && cm.pattern) {
+        const n = Math.min(CHEF_N, cm.frames || 0);
+        for (let i = 0; i < n; i++) {
+          const f = cm.pattern.replace(/%0(\d)d/, (_, w) => String(i).padStart(+w, '0'));
+          ents[chefName(i)] = { file: 'sprite-girl/' + f };
+        }
+      }
+      return ents;
+    });
   }
   return manifestP;
 }
